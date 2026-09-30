@@ -72,8 +72,8 @@ def test_registered_tags_non_empty():
 
 # --- categories / lifecycle --------------------------------------------------
 
-def test_categories_has_twelve_entries():
-    assert len(policy.CATEGORIES) == 12
+def test_categories_has_thirteen_entries():
+    assert len(policy.CATEGORIES) == 13
 
 
 def test_category_order_matches_categories_keys():

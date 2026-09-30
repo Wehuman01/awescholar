@@ -1,3 +1,3 @@
 """awescholar - Automated scientific literature discovery and curation."""
 
-__version__ = "0.3.3"
+__version__ = "0.3.4"

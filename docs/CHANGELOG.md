@@ -1,6 +1,10 @@
 # Changelog
 
-## Unreleased
+## v0.3.4 - 2026-09-30
+
+### Added
+
+- New primary AgentX category 'models' ("Models & Simulation") — registry entries whose deliverable is a model rather than an agent workflow or an analysis library: representation-learning frameworks (MitoSpace4D), particle-based simulation engines and digital twins (ReaDDy-Cell, scMultiSim). Slots after 'datasets' in CATEGORY_ORDER. validate.py accepts the slug; intake via 'updater add --agentx --category models'.
 
 ### Changes
 
