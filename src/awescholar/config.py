@@ -133,10 +133,15 @@ def load_config(path: str | None) -> dict:
     model_profiles = raw.get("model_profiles") or {}
 
     profile_name = model.get("profile")
+    temperature = model.get("temperature")
     if profile_name and profile_name in model_profiles:
         profile = model_profiles[profile_name]
         api_key = profile.get("api_key") or model.get("api_key") or os.getenv("AWESCHOLAR_API_KEY")
         base_url = profile.get("base_url") or model.get("base_url") or os.getenv("AWESCHOLAR_BASE_URL")
+        # Explicit None checks: a profile temperature of 0.0 must win over a
+        # model-level setting, and both over the default.
+        if profile.get("temperature") is not None:
+            temperature = profile.get("temperature")
     else:
         api_key = model.get("api_key") or os.getenv("AWESCHOLAR_API_KEY")
         base_url = model.get("base_url") or os.getenv("AWESCHOLAR_BASE_URL")
@@ -145,6 +150,9 @@ def load_config(path: str | None) -> dict:
         "model": prefix_model(model.get("name")) or os.getenv("AWESCHOLAR_MODEL", "gpt-4.1-mini"),
         "api_key": api_key,
         "base_url": base_url,
+        # Sampling temperature for every LLM call resolved from this config.
+        # Some endpoints only accept one value (e.g. kimi's coding API: 1).
+        "temperature": temperature if temperature is not None else 0.0,
         "model_profiles": model_profiles,
         "agent_models": raw.get("agent_models"),
         "ss_api_key": ss.get("api_key") or ss_env_api_key(),
@@ -186,26 +194,30 @@ def resolve_agent_settings(
     fallback_key: str | None,
     fallback_url: str | None,
     model_profiles: dict | None = None,
-) -> tuple[str, str | None, str | None]:
-    """Resolve model, api_key, and base_url for an agent."""
+    fallback_temperature: float = 0.0,
+) -> tuple[str, str | None, str | None, float]:
+    """Resolve model, api_key, base_url, and temperature for an agent."""
     if agent_models and isinstance(agent_models, dict):
         agent = agent_models.get(agent_name)
         if agent and isinstance(agent, dict):
             model_name = prefix_model(agent.get("name")) or fallback_model
+            temperature = agent.get("temperature", fallback_temperature)
             profile_name = agent.get("profile")
             if profile_name and model_profiles:
                 profile = model_profiles.get(profile_name, {})
                 api_key = profile.get("api_key") or agent.get("api_key") or fallback_key
                 base_url = profile.get("base_url") or agent.get("base_url") or fallback_url
+                if profile.get("temperature") is not None:
+                    temperature = profile.get("temperature")
             else:
                 api_key = agent.get("api_key") or fallback_key
                 base_url = agent.get("base_url") or fallback_url
-            return model_name, api_key, base_url
-    return fallback_model, fallback_key, fallback_url
+            return model_name, api_key, base_url, temperature
+    return fallback_model, fallback_key, fallback_url, fallback_temperature
 
 
-def resolve_agent_config(config: dict, agent_name: str) -> tuple[str, str | None, str | None]:
-    """Resolve model, api_key, and base_url for an agent from loaded config."""
+def resolve_agent_config(config: dict, agent_name: str) -> tuple[str, str | None, str | None, float]:
+    """Resolve model, api_key, base_url, and temperature for an agent from loaded config."""
     return resolve_agent_settings(
         config.get("agent_models"),
         agent_name,
@@ -213,4 +225,5 @@ def resolve_agent_config(config: dict, agent_name: str) -> tuple[str, str | None
         config["api_key"],
         config["base_url"],
         model_profiles=config.get("model_profiles"),
+        fallback_temperature=config.get("temperature", 0.0),
     )

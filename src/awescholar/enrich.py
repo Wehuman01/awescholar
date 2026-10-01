@@ -210,7 +210,8 @@ def _auto_pick(title_tokens: set[str], arxiv_id: str, candidates: list[dict],
 
 
 def _llm_pick(paper: dict, candidates: list[dict], model: str,
-              api_key: str | None, base_url: str | None) -> dict | None:
+              api_key: str | None, base_url: str | None,
+              temperature: float = 0.0) -> dict | None:
     """Ask the configured LLM which candidate is official; None on no pick."""
     payload = {
         "paper": {
@@ -235,6 +236,7 @@ def _llm_pick(paper: dict, candidates: list[dict], model: str,
         pick = complete(
             model, REPO_PICK_SYSTEM, json.dumps(payload, ensure_ascii=False),
             response_format=RepoPick, api_key=api_key, base_url=base_url,
+            temperature=temperature,
         )
     except Exception:  # noqa: BLE001 — one failed verdict must not abort the run
         return None
@@ -281,7 +283,8 @@ def _system_name_fallback(title: str) -> str:
 
 
 def resolve_repo(paper: dict, token: str | None, model: str = "",
-                 api_key: str | None = None, base_url: str | None = None) -> dict | None:
+                 api_key: str | None = None, base_url: str | None = None,
+                 temperature: float = 0.0) -> dict | None:
     """Find the official GitHub repository for a paper, or None.
 
     Search rounds: arXiv ID (a hit there means the repo cites the ID in its
@@ -314,7 +317,7 @@ def resolve_repo(paper: dict, token: str | None, model: str = "",
             continue
         pick = _auto_pick(title_tokens, arxiv_id, candidates, paper_year)
         if pick is None and model and api_key:
-            pick = _llm_pick(paper, candidates, model, api_key, base_url)
+            pick = _llm_pick(paper, candidates, model, api_key, base_url, temperature)
         if pick is not None:
             return pick
     return None
@@ -322,6 +325,7 @@ def resolve_repo(paper: dict, token: str | None, model: str = "",
 
 def _enrich_archive_shape(archive_path: str, *, token: str | None, model: str = "",
                           api_key: str | None = None, base_url: str | None = None,
+                          temperature: float = 0.0,
                           use_llm: bool = True, limit: int | None = None,
                           no_backup: bool = False, status_cb=print,
                           only: list[str] | None = None,
@@ -379,7 +383,8 @@ def _enrich_archive_shape(archive_path: str, *, token: str | None, model: str = 
     resolved = collisions = 0
     for i, (_, p) in enumerate(to_resolve, 1):
         repo = resolve_repo(p, token, model if llm_ready else "",
-                            api_key if llm_ready else None, base_url)
+                            api_key if llm_ready else None, base_url,
+                            temperature)
         if repo:
             p["codeUrl"] = repo.get("html_url") or f"https://github.com/{repo.get('full_name')}"
             if stars_style == "badge":
@@ -595,6 +600,7 @@ def _enrich_agentx_snapshot(archive_path: str, *, token: str | None,
 
 def enrich_archive(archive_path: str, token: str | None = None, *, mode: str = "archive",
                    model: str = "", api_key: str | None = None, base_url: str | None = None,
+                   temperature: float = 0.0,
                    use_llm: bool = True, limit: int | None = None,
                    no_backup: bool = False, status_cb=print,
                    only: list[str] | None = None,
@@ -613,7 +619,7 @@ def enrich_archive(archive_path: str, token: str | None = None, *, mode: str = "
     if mode == "archive":
         return _enrich_archive_shape(
             archive_path, token=token, model=model, api_key=api_key,
-            base_url=base_url, use_llm=use_llm, limit=limit,
+            base_url=base_url, temperature=temperature, use_llm=use_llm, limit=limit,
             no_backup=no_backup, status_cb=status_cb,
             only=only, since=since, stars_style=stars_style)
     if mode == "agentx":

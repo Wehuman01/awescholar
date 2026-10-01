@@ -81,9 +81,11 @@ Config uses `${ENV_VAR}` expansion. Sensitive values (API keys) must use `${VAR}
 
 Top-level keys: `model_profiles`, `model`, `agent_models`, `semantic_scholar`, `github`, `search`, `filter`, `output`, `pipeline`, `categories`.
 
-**`model_profiles`**: reusable profile map — each profile defines `api_key` and `base_url`. Referenced by `model.profile` or `agent_models.*.profile`.
+**`model_profiles`**: reusable profile map — each profile defines `api_key`, `base_url`, and optionally `temperature`. Referenced by `model.profile` or `agent_models.*.profile`.
 
 **`model.name`**: just the model name (e.g. `glm-5.1`). The `openai/` prefix is auto-prepended by `_prefix_model()`.
+
+**`temperature`**: sampling temperature for LLM calls, default `0.0`. Precedence: `model_profiles.<p>.temperature` > `model.temperature` / `agent_models.<agent>.temperature` > default. Exists for endpoints that only accept one value (kimi coding API requires `1`).
 
 **`agent_models`**: per-agent model overrides for annotator, filterer, reporter. Each entry can use `profile` to reference `model_profiles`. Falls back to global `model` config if not set.
 

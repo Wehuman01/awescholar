@@ -4,6 +4,11 @@
             "api_key": "${GLM_API_KEY}",
             "base_url": "your-openai-compatible-endpoint"
         },
+        "kimi": {
+            "api_key": "${KIMI_API_KEY}",
+            "base_url": "your-openai-compatible-endpoint",
+            "temperature": 1
+        },
         "gemini": {
             "api_key": "${GEMINI_API_KEY}",
             "base_url": "your-openai-compatible-endpoint"
@@ -19,7 +24,8 @@
     },
     "model": {
         "profile": "openai",
-        "name": "gpt-5.4-mini"
+        "name": "gpt-5.4-mini",
+        "temperature": 0.0
     },
     "agent_models": null,
     "semantic_scholar": {

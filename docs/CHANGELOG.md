@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.3.7
+
+model profiles and model/agent_models entries accept a temperature override (default 0.0, previous behavior); resolves endpoints that only accept one value, e.g. kimi's coding API requires temperature=1 — resolve_agent_settings/resolve_agent_config now return (model, api_key, base_url, temperature) and every LLM call site (crawler annotate/filter/report, digest, enrich tiebreak, agentx export --llm-category, reader recommend --llm, updater search --annotate) honors it
+
 ## v0.3.6 - 2026-10-01
 
 ### Added

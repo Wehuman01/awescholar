@@ -103,11 +103,11 @@ def cmd_annotate(args: argparse.Namespace, config: dict) -> int | None:
             for p in db_papers
         ]
 
-    model, api_key, base_url = resolve_agent_config(config, "annotator")
+    model, api_key, base_url, temperature = resolve_agent_config(config, "annotator")
     structured = run_annotate(
         papers=papers, model=model, categories=config["categories"],
         include_abstracts=config["include_abstracts"],
-        api_key=api_key, base_url=base_url, status_cb=status,
+        api_key=api_key, base_url=base_url, temperature=temperature, status_cb=status,
     )
 
     out_path = os.path.join(config["db_path"], "updater.json")
@@ -128,12 +128,12 @@ def cmd_filter(args: argparse.Namespace, config: dict) -> int | None:
     with open(updater_path, "r", encoding="utf-8") as f:
         structured = json.load(f)
 
-    model, api_key, base_url = resolve_agent_config(config, "filterer")
+    model, api_key, base_url, temperature = resolve_agent_config(config, "filterer")
     filtered = run_filter(
         structured_data=structured, model=model,
         limit=args.limit or config["limit_filter"],
         research_interests=config.get("research_interests"),
-        api_key=api_key, base_url=base_url, status_cb=status,
+        api_key=api_key, base_url=base_url, temperature=temperature, status_cb=status,
     )
 
     out_path = os.path.join(config["db_path"], "updater_filter.json")
@@ -153,11 +153,11 @@ def cmd_report(args: argparse.Namespace, config: dict) -> int | None:
     with open(filtered_path, "r", encoding="utf-8") as f:
         filtered = json.load(f)
 
-    model, api_key, base_url = resolve_agent_config(config, "reporter")
+    model, api_key, base_url, temperature = resolve_agent_config(config, "reporter")
     report = run_report(
         filtered_data=filtered, model=model,
         date_range=config.get("publication_date") or "N/A",
-        api_key=api_key, base_url=base_url, status_cb=status,
+        api_key=api_key, base_url=base_url, temperature=temperature, status_cb=status,
     )
 
     if args.output:
@@ -196,6 +196,7 @@ def cmd_run(args: argparse.Namespace, config: dict) -> int | None:
         merge_new_to_old=config["merge_new_to_old"],
         data_json_path=config["data_json_path"],
         research_interests=config.get("research_interests"),
+        temperature=config.get("temperature", 0.0),
         status_cb=status,
     )
 
@@ -354,8 +355,9 @@ def cmd_search_record(args: argparse.Namespace, config: dict) -> int | None:
         return 1
 
     model = api_key = base_url = None
+    temperature = 0.0
     if args.annotate:
-        model, api_key, base_url = resolve_agent_config(config, "annotator")
+        model, api_key, base_url, temperature = resolve_agent_config(config, "annotator")
         if not api_key:
             print("Error: --annotate needs a model API key (set --config or AWESCHOLAR_API_KEY).")
             return 1
@@ -368,6 +370,7 @@ def cmd_search_record(args: argparse.Namespace, config: dict) -> int | None:
         code_url=args.code_url, stars_style=stars_style,
         annotate=args.annotate, annotate_model=model or "",
         annotate_api_key=api_key, annotate_base_url=base_url,
+        annotate_temperature=temperature,
     )
 
     if stats["added"] and args.archive:
@@ -429,8 +432,9 @@ def cmd_enrich(args: argparse.Namespace, config: dict) -> int | None:
     archive = args.archive or "data/agents-snapshot.json"
 
     model = api_key = base_url = None
+    temperature = 0.0
     if not args.no_llm:
-        model, api_key, base_url = resolve_agent_config(config, "enricher")
+        model, api_key, base_url, temperature = resolve_agent_config(config, "enricher")
 
     token = config.get("github_token")
     if not token:
@@ -441,6 +445,7 @@ def cmd_enrich(args: argparse.Namespace, config: dict) -> int | None:
         archive_path=archive, token=token,
         mode="agentx" if args.agentx else "archive",
         model=model or "", api_key=api_key, base_url=base_url,
+        temperature=temperature,
         use_llm=not args.no_llm, limit=args.limit,
         no_backup=args.no_backup, status_cb=status,
         only=args.only, since=getattr(args, "since", None), stars_style=stars_style,
@@ -485,8 +490,9 @@ def cmd_export_agentx(args: argparse.Namespace, config: dict) -> int | None:
             return 1
 
     llm_model = llm_api_key = llm_base_url = None
+    llm_temperature = 0.0
     if args.llm_category:
-        llm_model, llm_api_key, llm_base_url = resolve_agent_config(config, "annotator")
+        llm_model, llm_api_key, llm_base_url, llm_temperature = resolve_agent_config(config, "annotator")
         if not llm_api_key:
             print("Error: --llm-category needs a model API key (set --config or AWESCHOLAR_API_KEY).",
                   file=sys.stderr)
@@ -500,6 +506,7 @@ def cmd_export_agentx(args: argparse.Namespace, config: dict) -> int | None:
         categories=args.categories.split(",") if args.categories else None,
         exclude_snapshot=args.exclude_snapshot,
         llm_model=llm_model, llm_api_key=llm_api_key, llm_base_url=llm_base_url,
+        llm_temperature=llm_temperature,
         status_cb=status,
     )
 
@@ -517,13 +524,15 @@ def cmd_digest(args: argparse.Namespace, config: dict) -> int | None:
         return 1
 
     model = api_key = base_url = None
+    temperature = 0.0
     if not args.no_llm and config.get("api_key"):
-        model, api_key, base_url = resolve_agent_config(config, "reporter")
+        model, api_key, base_url, temperature = resolve_agent_config(config, "reporter")
 
     try:
         markdown = run_digest(
             archive_path=args.archive, year=year, month=month,
-            model=model or "", api_key=api_key, base_url=base_url, status_cb=status,
+            model=model or "", api_key=api_key, base_url=base_url,
+            temperature=temperature, status_cb=status,
         )
     except ValueError as exc:
         print(f"Error: {exc}", file=sys.stderr)
@@ -726,13 +735,15 @@ def cmd_reader_recommend(args: argparse.Namespace, config: dict) -> int | None:
     from .reader import run_recommend
 
     model = api_key = base_url = None
+    temperature = 0.0
     if args.llm:
-        model, api_key, base_url = resolve_agent_config(config, "recommender")
+        model, api_key, base_url, temperature = resolve_agent_config(config, "recommender")
         if not api_key:
             print("Error: --llm needs a model API key (set --config or AWESCHOLAR_API_KEY).")
             return 1
     run_recommend(args.archive, args.field, top=args.top, as_json=args.json, llm=args.llm,
-                  model=model or "", api_key=api_key, base_url=base_url, status_cb=status)
+                  model=model or "", api_key=api_key, base_url=base_url,
+                  temperature=temperature, status_cb=status)
 
 
 def cmd_reader_stats(args: argparse.Namespace, config: dict) -> int | None:

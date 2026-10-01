@@ -129,6 +129,7 @@ _CATEGORY_SYSTEM = (
 
 def _classify_categories(agents: list[dict], known_categories: set[str],
                          model: str, api_key: str | None, base_url: str | None,
+                         temperature: float = 0.0,
                          status_cb=print, complete_fn=None) -> dict[str, str]:
     """LLM pick of an agentx category per candidate, as a repo->slug map.
 
@@ -150,7 +151,8 @@ def _classify_categories(agents: list[dict], known_categories: set[str],
                                  user=f"Allowed category slugs: {allowed}\n"
                                       f"Candidates (repo :: paper title :: repo description):\n{lines}",
                                  response_format=_CategoryPicks,
-                                 api_key=api_key, base_url=base_url)
+                                 api_key=api_key, base_url=base_url,
+                                 temperature=temperature)
         except Exception as exc:  # noqa: BLE001 - an LLM hiccup must not kill the export
             status_cb(f"  Warning: LLM category pass failed ({exc}); keeping defaults")
             return picks
@@ -167,7 +169,8 @@ def export_agentx(archive_path: str, output_path: str, token: str | None = None,
                   categories: list[str] | None = None,
                   exclude_snapshot: str | None = None,
                   llm_model: str | None = None, llm_api_key: str | None = None,
-                  llm_base_url: str | None = None, classify_fn=None,
+                  llm_base_url: str | None = None, llm_temperature: float = 0.0,
+                  classify_fn=None,
                   status_cb=print) -> dict:
     """Write an AgentX-shaped candidate file from papers with GitHub repos.
 
@@ -256,7 +259,7 @@ def export_agentx(archive_path: str, output_path: str, token: str | None = None,
     if llm_model and known_categories and agents:
         picks = (classify_fn or _classify_categories)(
             agents, known_categories, llm_model, llm_api_key, llm_base_url,
-            status_cb=status_cb)
+            temperature=llm_temperature, status_cb=status_cb)
         applied = 0
         for a in agents:
             slug = picks.get(a["repo"].lower())

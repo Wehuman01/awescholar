@@ -270,11 +270,67 @@ def test_resolve_agent_config_prefixes_agent_model_names():
         },
     }
 
-    model, api_key, base_url = resolve_agent_config(config, "reporter")
+    model, api_key, base_url, temperature = resolve_agent_config(config, "reporter")
 
     assert model == "openai/glm-5.1"
     assert api_key == "profile-key"
     assert base_url == "https://profile.example"
+    assert temperature == 0.0
+
+
+def test_resolve_agent_temperature_precedence():
+    """Profile temperature wins, then agent-level, then the global fallback."""
+    profiles = {"kimi": {"api_key": "k", "base_url": "https://k.example", "temperature": 1}}
+    base = {"model": "openai/m", "api_key": "gk", "base_url": "https://g.example",
+            "model_profiles": profiles}
+
+    # Profile sets it -> 1 even when the global fallback is 0.0.
+    _, _, _, temperature = resolve_agent_config(
+        {**base, "agent_models": {"reporter": {"profile": "kimi", "name": "k3"}}}, "reporter")
+    assert temperature == 1
+
+    # Agent-level entry without a profile temperature -> agent value.
+    _, _, _, temperature = resolve_agent_config(
+        {**base, "agent_models": {"reporter": {"name": "m", "temperature": 0.7}}}, "reporter")
+    assert temperature == 0.7
+
+    # Nothing configured -> fallback.
+    _, _, _, temperature = resolve_agent_config(
+        {**base, "agent_models": {"reporter": {"name": "m"}}}, "reporter")
+    assert temperature == 0.0
+
+    # A profile temperature of 0.0 is honored, not treated as unset.
+    _, _, _, temperature = resolve_agent_config(
+        {**base, "model_profiles": {"cold": {"api_key": "k", "temperature": 0.0}},
+         "agent_models": {"reporter": {"profile": "cold", "name": "m"}}}, "reporter")
+    assert temperature == 0.0
+
+
+def test_load_config_reads_model_temperature(monkeypatch, tmp_path):
+    monkeypatch.setenv("HOME", str(tmp_path))
+    global_dir = tmp_path / ".config" / "awescholar"
+    global_dir.mkdir(parents=True)
+    (global_dir / "config.json").write_text(json.dumps(
+        {"model_profiles": {"kimi": {"api_key": "k", "base_url": "https://k.example",
+                                      "temperature": 1}}}), encoding="utf-8")
+    config_path = tmp_path / "project.json"
+    config_path.write_text(json.dumps(
+        {"model": {"profile": "kimi", "name": "kimi/k3"}}), encoding="utf-8")
+
+    assert load_config(str(config_path))["temperature"] == 1
+
+    config_path.write_text(json.dumps(
+        {"model": {"profile": "kimi", "name": "kimi/k3", "temperature": 0.5}}),
+        encoding="utf-8")
+    # Profile still wins over the model-level value.
+    assert load_config(str(config_path))["temperature"] == 1
+
+    config_path.write_text(json.dumps(
+        {"model": {"name": "glm-5.1", "temperature": 0.5}}), encoding="utf-8")
+    assert load_config(str(config_path))["temperature"] == 0.5
+
+    config_path.write_text(json.dumps({"model": {"name": "glm-5.1"}}), encoding="utf-8")
+    assert load_config(str(config_path))["temperature"] == 0.0
 
 
 def test_version_constant_matches_package_metadata():

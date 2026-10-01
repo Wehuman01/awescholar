@@ -280,7 +280,8 @@ def recommend(archive_path: str, field: str, top: int = 10) -> tuple[list[dict],
 
 def recommend_with_llm(archive_path: str, field: str, top: int = 10,
                        model: str = "", api_key: str | None = None,
-                       base_url: str | None = None, status_cb=None) -> tuple[list[dict], dict]:
+                       base_url: str | None = None, temperature: float = 0.0,
+                       status_cb=None) -> tuple[list[dict], dict]:
     """LLM-ranked must-read list. Candidates come from offline relevance (top
     40); the model picks and motivates; picks are matched back to archive
     entries so every recommendation carries a link and a category."""
@@ -299,7 +300,8 @@ def recommend_with_llm(archive_path: str, field: str, top: int = 10,
     user = (f"Researcher field/interests: {field}\n"
             f"Picks requested: {top}\n\nCandidates:\n{json.dumps(payload, ensure_ascii=False)}")
     result = complete(model=model, system=RECOMMENDER, user=user,
-                      response_format=Recommendation, api_key=api_key, base_url=base_url)
+                      response_format=Recommendation, api_key=api_key, base_url=base_url,
+                      temperature=temperature)
 
     by_title = {normalize_title(p.get("title")): p for p in load_papers(archive_path)}
     hits, unmatched = [], 0
@@ -421,10 +423,12 @@ def run_related(archive_path: str, seed: dict, top: int = 5, as_json: bool = Fal
 
 def run_recommend(archive_path: str, field: str, top: int = 10, as_json: bool = False,
                   llm: bool = False, model: str = "", api_key: str | None = None,
-                  base_url: str | None = None, status_cb=None) -> None:
+                  base_url: str | None = None, temperature: float = 0.0,
+                  status_cb=None) -> None:
     if llm:
         hits, meta = recommend_with_llm(archive_path, field, top=top, model=model,
-                                        api_key=api_key, base_url=base_url, status_cb=status_cb)
+                                        api_key=api_key, base_url=base_url,
+                                        temperature=temperature, status_cb=status_cb)
     else:
         hits, meta = recommend(archive_path, field, top=top)
 

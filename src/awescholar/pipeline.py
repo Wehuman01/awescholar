@@ -55,6 +55,7 @@ def run_annotate(
     include_abstracts: bool = True,
     api_key: str | None = None,
     base_url: str | None = None,
+    temperature: float = 0.0,
     status_cb: StatusCallback = None,
 ) -> dict[str, list[dict]]:
     """Annotate papers with domain and category. Returns structured dict by category."""
@@ -75,6 +76,7 @@ def run_annotate(
             result = complete(
                 model=model, system=prompts.ANNOTATOR, user=papers_xml,
                 response_format=AnnotationResult, api_key=api_key, base_url=base_url,
+                temperature=temperature,
             )
             if isinstance(result, AnnotationResult):
                 break
@@ -109,6 +111,7 @@ def run_filter(
     research_interests: str | list[str] | None = None,
     api_key: str | None = None,
     base_url: str | None = None,
+    temperature: float = 0.0,
     status_cb: StatusCallback = None,
 ) -> dict[str, list[dict]]:
     """Filter papers for quality and relevance. Returns filtered structured data."""
@@ -136,6 +139,7 @@ def run_filter(
         model=model, system=prompts.FILTER,
         user=json.dumps(user_payload, indent=2, cls=DateEncoder),
         response_format=FilterResult, api_key=api_key, base_url=base_url,
+        temperature=temperature,
     )
     if isinstance(result, str):
         raise RuntimeError(f"Filter LLM returned invalid response. Raw: {result[:200]}")  # noqa: TRY004
@@ -173,6 +177,7 @@ def run_report(
     date_range: str = "N/A",
     api_key: str | None = None,
     base_url: str | None = None,
+    temperature: float = 0.0,
     status_cb: StatusCallback = None,
     system_prompt: str | None = None,
 ) -> str:
@@ -188,7 +193,7 @@ def run_report(
     result = complete(
         model=model, system=system,
         user=json.dumps(filtered_data, indent=2, ensure_ascii=False, cls=DateEncoder),
-        api_key=api_key, base_url=base_url,
+        api_key=api_key, base_url=base_url, temperature=temperature,
     )
     cb("Report generated.")
     return report_provenance(model, date_range) + result
@@ -244,6 +249,7 @@ def run_pipeline(
     data_json_path: str | None = None,
     model_profiles: dict | None = None,
     research_interests: str | list[str] | None = None,
+    temperature: float = 0.0,
     status_cb: StatusCallback = None,
 ) -> tuple[dict, str]:
     """Run full pipeline with optional skip/resume controls.
@@ -266,11 +272,12 @@ def run_pipeline(
         with open(filtered_path, "r", encoding="utf-8") as f:
             filtered = json.load(f)
         _merge_filtered_to_data(filtered_path, data_json_path, merge_new_to_old, cb)
-        m, k, u = resolve_agent_settings(agent_models, "reporter", model, api_key, base_url, model_profiles)
+        m, k, u, t = resolve_agent_settings(agent_models, "reporter", model, api_key, base_url,
+                                            model_profiles, fallback_temperature=temperature)
         report = run_report(
             filtered_data=filtered, model=m,
             date_range=publication_date_or_year or "N/A",
-            api_key=k, base_url=u, status_cb=cb,
+            api_key=k, base_url=u, temperature=t, status_cb=cb,
         )
         return filtered, report
 
@@ -281,21 +288,23 @@ def run_pipeline(
             raise FileNotFoundError(f"Not found: {updater_path}")
         with open(updater_path, "r", encoding="utf-8") as f:
             structured = json.load(f)
-        m, k, u = resolve_agent_settings(agent_models, "filterer", model, api_key, base_url, model_profiles)
+        m, k, u, t = resolve_agent_settings(agent_models, "filterer", model, api_key, base_url,
+                                            model_profiles, fallback_temperature=temperature)
         filtered = run_filter(
             structured_data=structured, model=m, limit=limit_filter,
             research_interests=research_interests,
-            api_key=k, base_url=u, status_cb=cb,
+            api_key=k, base_url=u, temperature=t, status_cb=cb,
         )
         with open(filtered_path, "w", encoding="utf-8") as f:
             json.dump(filtered, f, indent=2, ensure_ascii=False, cls=DateEncoder)
         cb(f"Saved filtered data to {filtered_path}")
         _merge_filtered_to_data(filtered_path, data_json_path, merge_new_to_old, cb)
-        m, k, u = resolve_agent_settings(agent_models, "reporter", model, api_key, base_url, model_profiles)
+        m, k, u, t = resolve_agent_settings(agent_models, "reporter", model, api_key, base_url,
+                                            model_profiles, fallback_temperature=temperature)
         report = run_report(
             filtered_data=filtered, model=m,
             date_range=publication_date_or_year or "N/A",
-            api_key=k, base_url=u, status_cb=cb,
+            api_key=k, base_url=u, temperature=t, status_cb=cb,
         )
         return filtered, report
 
@@ -327,21 +336,23 @@ def run_pipeline(
             raise RuntimeError("No papers found for the given query. Try broadening your search terms.")
 
     # --- Annotate phase ---
-    m, k, u = resolve_agent_settings(agent_models, "annotator", model, api_key, base_url, model_profiles)
+    m, k, u, t = resolve_agent_settings(agent_models, "annotator", model, api_key, base_url,
+                                        model_profiles, fallback_temperature=temperature)
     structured = run_annotate(
         papers=papers, model=m, categories=categories,
-        include_abstracts=include_abstracts, api_key=k, base_url=u, status_cb=cb,
+        include_abstracts=include_abstracts, api_key=k, base_url=u, temperature=t, status_cb=cb,
     )
     with open(updater_path, "w", encoding="utf-8") as f:
         json.dump(structured, f, indent=2, ensure_ascii=False, cls=DateEncoder)
     cb(f"Saved annotated data to {updater_path}")
 
     # --- Filter phase ---
-    m, k, u = resolve_agent_settings(agent_models, "filterer", model, api_key, base_url, model_profiles)
+    m, k, u, t = resolve_agent_settings(agent_models, "filterer", model, api_key, base_url,
+                                        model_profiles, fallback_temperature=temperature)
     filtered = run_filter(
         structured_data=structured, model=m, limit=limit_filter,
         research_interests=research_interests,
-        api_key=k, base_url=u, status_cb=cb,
+        api_key=k, base_url=u, temperature=t, status_cb=cb,
     )
     with open(filtered_path, "w", encoding="utf-8") as f:
         json.dump(filtered, f, indent=2, ensure_ascii=False, cls=DateEncoder)
@@ -349,11 +360,12 @@ def run_pipeline(
     _merge_filtered_to_data(filtered_path, data_json_path, merge_new_to_old, cb)
 
     # --- Report phase ---
-    m, k, u = resolve_agent_settings(agent_models, "reporter", model, api_key, base_url, model_profiles)
+    m, k, u, t = resolve_agent_settings(agent_models, "reporter", model, api_key, base_url,
+                                        model_profiles, fallback_temperature=temperature)
     report = run_report(
         filtered_data=filtered, model=m,
         date_range=publication_date_or_year or "N/A",
-        api_key=k, base_url=u, status_cb=cb,
+        api_key=k, base_url=u, temperature=t, status_cb=cb,
     )
 
     return filtered, report

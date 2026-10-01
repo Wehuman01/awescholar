@@ -82,6 +82,7 @@ def run_digest(
     model: str = "",
     api_key: str | None = None,
     base_url: str | None = None,
+    temperature: float = 0.0,
     status_cb: StatusCallback = None,
 ) -> str:
     """Render the monthly digest markdown for one month of a curated archive.
@@ -106,7 +107,7 @@ def run_digest(
         cb(f"Generating {month_label} digest with {model.split('/')[-1]}...")
         return run_report(
             filtered_data=month_papers, model=model, date_range=month_label,
-            api_key=api_key, base_url=base_url, status_cb=cb,
+            api_key=api_key, base_url=base_url, temperature=temperature, status_cb=cb,
             system_prompt=prompts.DIGEST_REPORTER.replace("{month}", month_label),
         )
 

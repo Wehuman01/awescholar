@@ -188,7 +188,9 @@ Copy `config.example.json` from the [repo root](https://github.com/wehuman01/awe
 
 **`model.name`** — just the model name, e.g. `glm-5.1`, `deepseek-chat`, `gpt-4o`. The `openai/` prefix is auto-prepended for OpenAI-compatible endpoints — do NOT add it manually.
 
-**`model_profiles`** — reusable profile map. Each profile defines `api_key` and `base_url`. Referenced by `model.profile` or `agent_models.*.profile`, avoiding credential duplication.
+**`temperature`** — sampling temperature for every LLM call (default `0.0`). Settable at three levels; more specific wins: `model_profiles.<p>.temperature` > `model.temperature` (and `agent_models.<agent>.temperature`) > default. Endpoints that only accept one value need this — kimi's coding API, for example, rejects anything but `1`.
+
+**`model_profiles`** — reusable profile map. Each profile defines `api_key`, `base_url`, and optionally `temperature`. Referenced by `model.profile` or `agent_models.*.profile`, avoiding credential duplication.
 
 **`agent_models`** — override model per agent (annotator, filterer, reporter). Each entry can use `profile` to reference a `model_profiles` entry, or set `name`/`api_key`/`base_url` directly:
 ```json

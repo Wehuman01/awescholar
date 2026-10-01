@@ -368,6 +368,7 @@ def _annotate_records(
     annotate_model: str,
     annotate_api_key: str | None,
     annotate_base_url: str | None,
+    annotate_temperature: float,
     categories: list[str] | None,
 ) -> None:
     """Fill `domain` for added records with a DOI via run_annotate (in place)."""
@@ -392,6 +393,7 @@ def _annotate_records(
             categories=categories,
             api_key=annotate_api_key,
             base_url=annotate_base_url,
+            temperature=annotate_temperature,
         )
     except Exception as e:  # noqa: BLE001 — an LLM failure must not lose added records
         print(f"  Annotation failed: {e}")
@@ -440,6 +442,7 @@ def search_and_add(
     annotate_model: str = "",
     annotate_api_key: str | None = None,
     annotate_base_url: str | None = None,
+    annotate_temperature: float = 0.0,
 ) -> dict:
     """Search Semantic Scholar by title or DOI and add records to archive or json file.
 
@@ -500,7 +503,8 @@ def search_and_add(
 
         if added_records:
             _annotate_records(added_records, stats, annotate, annotate_model,
-                              annotate_api_key, annotate_base_url, categories=None)
+                              annotate_api_key, annotate_base_url,
+                              annotate_temperature, categories=None)
             for record in added_records:
                 _apply_code(record, norm_code_url, stars_style)
                 record.pop("abstract", None)
@@ -552,7 +556,8 @@ def search_and_add(
 
         if added_records:
             _annotate_records(added_records, stats, annotate, annotate_model,
-                              annotate_api_key, annotate_base_url, categories=categories)
+                              annotate_api_key, annotate_base_url,
+                              annotate_temperature, categories=categories)
             if target not in archive:
                 archive[target] = []
             for record in added_records:
