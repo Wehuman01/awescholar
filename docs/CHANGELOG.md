@@ -2,6 +2,10 @@
 
 ## v0.3.6 - 2026-10-01
 
+### Added
+
+- New venue tag `Innovation` for Cell-partner journal *The Innovation*, with `VENUE_ALIASES` entries for the full title ("The Innovation") and Semantic Scholar's venue spelling ("Innovation (Cambridge (Mass.))") — the hub's battery-LLM review entry carries `paperMeta.venue: "The Innovation"`, which now resolves to the tag and passes the venue-tags invariant once the entry carries `tags: ["Innovation"]`.
+
 ### Fixed
 
 - `render counts` now refreshes a "Browse the Collection" bullet whose anchor uses the website's shorter section id when it uniquely prefixes the category-derived slug — Awesome-AI-Meets-Biology's `Databases/Simulation` bullet links to `#databases`, which never matched `databases-simulation`, so that line's count silently went stale on every render. Ambiguous prefixes (two categories sharing the short slug) are still left untouched.

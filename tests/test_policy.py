@@ -44,6 +44,9 @@ def test_canonical_venue_folds_alias_spellings():
     assert policy.canonical_venue("NeurIPS 2025") == "NeurIPS"
     assert policy.canonical_venue("The Lancet Digital Health") == \
         "Lancet-Digital-Health"
+    assert policy.canonical_venue("The Innovation") == "Innovation"
+    assert policy.canonical_venue("Innovation (Cambridge (Mass.))") == \
+        "Innovation"
 
 
 def test_canonical_venue_folds_punctuation_stripped_case_insensitive():

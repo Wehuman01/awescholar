@@ -259,6 +259,7 @@ TAG_TYPE: dict[str, str] = {
     "Advanced-Materials": "venue",
     "ACL-Findings": "venue",
     "EMNLP-Findings": "venue",
+    "Innovation": "venue",
     # tech — agent-relevant framework/protocol it builds on
     "MCP": "tech",
     "A2A": "tech",
@@ -284,6 +285,9 @@ VENUE_ALIASES: dict[str, str] = {
     # journals — abbreviations and full names
     "Nature Biomedical Engineering": "Nature-BME",
     "The Lancet Digital Health": "Lancet-Digital-Health",
+    # Cell-partner journal "The Innovation"; S2 carries "Innovation (Cambridge (Mass.))"
+    "The Innovation": "Innovation",
+    "Innovation (Cambridge (Mass.))": "Innovation",
     "Journal of chemical information and modeling": "JCIM",
     "IEEE transactions on bio-medical engineering": "IEEE-TBME",
     "Bioinform.": "Bioinformatics",
