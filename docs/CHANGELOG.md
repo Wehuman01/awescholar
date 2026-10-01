@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.3.8 - 2026-10-01
+
+### Added
+
+- New venue tags `EMNLP`, `ACL`, `ICML`, with `VENUE_ALIASES` entries for the Semantic Scholar / ACL Anthology full-proceedings spellings that previously passed through unfolded (and rendered at full length on the website): "Conference on Empirical Methods in Natural Language Processing" and "Proceedings of the 2025 Conference on Empirical Methods in Natural Language Processing" → `EMNLP`; "Proceedings of the 63rd Annual Meeting of the Association for Computational Linguistics (Volume 1: Long Papers)" and "Annual Meeting of the Association for Computational Linguistics" → `ACL`; "International Conference on Machine Learning" → `ICML`. Snapshot entries whose venue resolves through the new aliases now carry the tag, per the venue-tags invariant (EMNLP: agentreview, pptagent, liddia; ACL: hypothesis-generation, surveyforge, virtual-scientists; ICML: ds-agent; plus coi-agent corrected to "Findings of EMNLP 2025" → `EMNLP-Findings`).
+
 ## v0.3.7
 
 model profiles and model/agent_models entries accept a temperature override (default 0.0, previous behavior); resolves endpoints that only accept one value, e.g. kimi's coding API requires temperature=1 — resolve_agent_settings/resolve_agent_config now return (model, api_key, base_url, temperature) and every LLM call site (crawler annotate/filter/report, digest, enrich tiebreak, agentx export --llm-category, reader recommend --llm, updater search --annotate) honors it

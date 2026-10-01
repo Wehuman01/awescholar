@@ -49,6 +49,26 @@ def test_canonical_venue_folds_alias_spellings():
         "Innovation"
 
 
+def test_canonical_venue_folds_nlp_and_ml_conference_proceedings():
+    assert policy.canonical_venue(
+        "Conference on Empirical Methods in Natural Language Processing"
+    ) == "EMNLP"
+    assert policy.canonical_venue(
+        "Proceedings of the 2025 Conference on Empirical Methods in"
+        " Natural Language Processing"
+    ) == "EMNLP"
+    assert policy.canonical_venue(
+        "Proceedings of the 63rd Annual Meeting of the Association for"
+        " Computational Linguistics (Volume 1: Long Papers)"
+    ) == "ACL"
+    assert policy.canonical_venue(
+        "Annual Meeting of the Association for Computational Linguistics"
+    ) == "ACL"
+    assert policy.canonical_venue(
+        "International Conference on Machine Learning"
+    ) == "ICML"
+
+
 def test_canonical_venue_folds_punctuation_stripped_case_insensitive():
     assert policy.canonical_venue("arxiv.org") == "arXiv"
     assert policy.canonical_venue("  Methods and Protocols ") == \

@@ -260,6 +260,9 @@ TAG_TYPE: dict[str, str] = {
     "ACL-Findings": "venue",
     "EMNLP-Findings": "venue",
     "Innovation": "venue",
+    "EMNLP": "venue",
+    "ACL": "venue",
+    "ICML": "venue",
     # tech — agent-relevant framework/protocol it builds on
     "MCP": "tech",
     "A2A": "tech",
@@ -282,6 +285,12 @@ VENUE_ALIASES: dict[str, str] = {
     "2024 IEEE International Conference on Data Mining Workshops (ICDMW)":
         "ICDMW",
     "ICDMW-2024": "ICDMW",
+    "International Conference on Machine Learning": "ICML",
+    # NLP conferences — S2/ACL Anthology full-proceedings spellings
+    "Conference on Empirical Methods in Natural Language Processing": "EMNLP",
+    "Proceedings of the 2025 Conference on Empirical Methods in Natural Language Processing": "EMNLP",
+    "Proceedings of the 63rd Annual Meeting of the Association for Computational Linguistics (Volume 1: Long Papers)": "ACL",
+    "Annual Meeting of the Association for Computational Linguistics": "ACL",
     # journals — abbreviations and full names
     "Nature Biomedical Engineering": "Nature-BME",
     "The Lancet Digital Health": "Lancet-Digital-Health",
