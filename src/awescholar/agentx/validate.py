@@ -79,6 +79,12 @@ def validate_snapshot_file(file: object) -> list[str]:
     if not _is_int(gone) or gone < 0 or gone > len(agents):
         problems.append(f"counts.gone is {gone} — expected an integer in [0, {len(agents)}]")
 
+    # Version clock stamped by write_snapshot on every real write; absent on
+    # files older than the stamping itself. Never fabricated here.
+    stamp = file.get("generatedAt")
+    if stamp is not None and (not isinstance(stamp, str) or not _iso_parseable(stamp)):
+        problems.append(f"generatedAt is {stamp!r} — expected an ISO-8601 timestamp")
+
     def where(i: int, slug) -> str:
         if isinstance(slug, str) and slug:
             return f"agents[{i}] ({slug})"

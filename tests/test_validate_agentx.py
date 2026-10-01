@@ -81,6 +81,20 @@ def test_rejects_malformed_listed_at():
     assert any("listedAt" in p for p in problems)
 
 
+def test_accepts_optional_generated_at_stamp():
+    fixture = _fixture()
+    fixture["generatedAt"] = "2026-10-01T02:00:00Z"
+    assert validate.validate_snapshot_file(fixture) == []
+
+
+def test_rejects_malformed_generated_at_stamp():
+    fixture = _fixture()
+    fixture["generatedAt"] = "yesterday"
+    assert validate.validate_snapshot_file(fixture) == [
+        "generatedAt is 'yesterday' — expected an ISO-8601 timestamp",
+    ]
+
+
 def test_rejects_non_objects_and_missing_agents_arrays():
     assert validate.validate_snapshot_file(None) == ["top level is not an object"]
     assert validate.validate_snapshot_file({"counts": {}}) == ["agents is not an array"]

@@ -135,6 +135,55 @@ def test_rewrite_preserves_registry_agent_ordering(tmp_path):
     )
 
 
+# ── generatedAt version stamp ──────────────────────────────────
+
+
+def test_write_stamps_generated_at_on_a_real_write(tmp_path, monkeypatch):
+    monkeypatch.setattr(snapshot, "_utc_now_iso", lambda: "2026-10-01T02:00:00Z")
+    path = str(tmp_path / "agents-snapshot.json")
+    snapshot.write_snapshot(path, _fixture())
+    with open(path, encoding="utf-8") as f:
+        raw = json.load(f)
+    assert raw["generatedAt"] == "2026-10-01T02:00:00Z"
+    # Stamp leads the file so it reads as what it is: the snapshot's header.
+    assert list(raw) == ["generatedAt", "agents", "counts"]
+
+
+def test_write_leaves_the_file_untouched_when_nothing_changed(tmp_path, monkeypatch):
+    path = str(tmp_path / "agents-snapshot.json")
+    snapshot.write_snapshot(path, _fixture())
+    with open(path, encoding="utf-8") as f:
+        before = f.read()
+
+    # Same content arriving again must not restamp — a quiet day stays quiet.
+    monkeypatch.setattr(snapshot, "_utc_now_iso", lambda: "2099-01-01T00:00:00Z")
+    snapshot.write_snapshot(path, snapshot.read_snapshot(path))
+    with open(path, encoding="utf-8") as f:
+        assert f.read() == before
+
+
+def test_write_restamps_when_content_changes(tmp_path, monkeypatch):
+    path = str(tmp_path / "agents-snapshot.json")
+    monkeypatch.setattr(snapshot, "_utc_now_iso", lambda: "2026-10-01T02:00:00Z")
+    snapshot.write_snapshot(path, _fixture())
+
+    file = snapshot.read_snapshot(path)
+    file["agents"][0]["stars"] = 43
+    monkeypatch.setattr(snapshot, "_utc_now_iso", lambda: "2026-10-01T09:00:00Z")
+    snapshot.write_snapshot(path, file)
+
+    reread = snapshot.read_snapshot(path)
+    assert reread["generatedAt"] == "2026-10-01T09:00:00Z"
+    assert reread["agents"][0]["stars"] == 43
+
+
+def test_write_into_a_missing_file_stamps_without_reading(tmp_path):
+    # No file on disk yet: comparison degrades to "changed", never crashes.
+    path = str(tmp_path / "nested" / "agents-snapshot.json")
+    snapshot.write_snapshot(path, _fixture())
+    assert snapshot.read_snapshot(path)["generatedAt"]
+
+
 # ── slugify ───────────────────────────────────────────────────
 
 

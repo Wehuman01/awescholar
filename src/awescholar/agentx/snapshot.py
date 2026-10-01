@@ -10,6 +10,7 @@ snapshot FILE PATH directly (the archive_path convention), not a root dir.
 import json
 import os
 import re
+from datetime import UTC, datetime
 
 from .transform import normalize_homepage
 
@@ -24,22 +25,47 @@ def read_snapshot(snapshot_file: str) -> dict:
         return json.load(f)
 
 
+def _utc_now_iso() -> str:
+    return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _body_unchanged(snapshot_file: str, body: dict) -> bool:
+    """True when the file on disk already holds exactly this agents+counts.
+
+    Parsed-JSON comparison, so key order inside the file does not matter;
+    `generatedAt` is deliberately ignored — a stamp never counts as a
+    content change.
+    """
+    try:
+        with open(snapshot_file, encoding="utf-8") as f:
+            existing = json.load(f)
+    except (OSError, ValueError):
+        return False
+    return {k: existing.get(k) for k in ("agents", "counts")} == body
+
+
 def write_snapshot(snapshot_file: str, file: dict) -> None:
     """Sort into stable slug order, refresh counts.total, write pretty JSON.
 
-    Stable slug order => deterministic diffs, and the daily workflow only
-    commits when data actually changed; the file intentionally carries NO
-    timestamp for the same reason. Slugs sort in plain codepoint order
-    (`sorted`) — the TypeScript writer uses the same comparator, aligned
-    after ICU localeCompare disagreed on digit-vs-underscore slugs.
+    Stable slug order => deterministic diffs (`sorted`, plain codepoint
+    order). Every real write stamps a top-level `generatedAt` (UTC) — the
+    snapshot's version clock, so the website applies snapshots
+    monotonically and a stale copy can never roll the registry database
+    back. A write that changes no agents+counts leaves the file untouched:
+    no new stamp, no diff — which is what keeps the daily workflow
+    commit-free on quiet days.
     """
     file["agents"] = sorted(file["agents"], key=lambda a: a["slug"])
     file["counts"]["total"] = len(file["agents"])
+    body = {"agents": file["agents"], "counts": file["counts"]}
+    if _body_unchanged(snapshot_file, body):
+        return
+    out = {"generatedAt": _utc_now_iso(), **body}
     parent = os.path.dirname(snapshot_file)
     if parent:
         os.makedirs(parent, exist_ok=True)
     with open(snapshot_file, "w", encoding="utf-8") as f:
-        json.dump(file, f, indent=2, ensure_ascii=False)
+        json.dump(out, f, indent=2, ensure_ascii=False)
         f.write("\n")
 
 

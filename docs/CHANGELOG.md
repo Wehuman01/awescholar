@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.3.5 - 2026-10-01
+
+### Added
+
+- AgentX snapshot version stamp: `write_snapshot` now writes a top-level `generatedAt` (UTC, second precision) on every write that actually changes agents+counts. The website's snapshot apply becomes monotonic on this clock — a stale copy of the file (an old deployment bundle, an unpulled working tree) can no longer roll the registry database back to older metrics, which is how a local dev boot silently reverted a fresh CI refresh. A write that changes nothing leaves the file byte-identical (no restamp, no diff), so quiet days stay commit-free exactly as before. `validate.py` accepts the stamp when present and rejects a non-ISO value.
+
 ## v0.3.4 - 2026-09-30
 
 ### Added
