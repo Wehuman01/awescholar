@@ -49,6 +49,22 @@ def warn_missing_github_token() -> None:
     )
 
 
+def zotero_env_api_key() -> str | None:
+    """Read the Zotero Web API key from the environment."""
+    return os.getenv("ZOTERO_API_KEY")
+
+
+def warn_missing_zotero_key() -> None:
+    """Warn on stderr when no Zotero API key could be resolved."""
+    print(
+        "Warning: no Zotero API key found. Create one at "
+        "https://www.zotero.org/settings/keys with read/write access, then set "
+        "ZOTERO_API_KEY, add it to ~/.config/awescholar/.env, or configure "
+        "zotero.api_key.",
+        file=sys.stderr,
+    )
+
+
 def _expand_env_vars(value):
     """Replace ${VAR} patterns with environment variable values."""
     if isinstance(value, str):
@@ -108,6 +124,7 @@ def load_config(path: str | None) -> dict:
     model = raw.get("model", {})
     ss = raw.get("semantic_scholar", {})
     gh = raw.get("github", {})
+    zo = raw.get("zotero", {})
     search = raw.get("search", {})
     filt = raw.get("filter", {})
     output = raw.get("output", {})
@@ -132,6 +149,11 @@ def load_config(path: str | None) -> dict:
         "agent_models": raw.get("agent_models"),
         "ss_api_key": ss.get("api_key") or ss_env_api_key(),
         "github_token": gh.get("token") or gh_env_token(),
+        # Zotero Web API: library_type user|group; a user library resolves its
+        # id from the key itself, a group library must name zotero.library_id.
+        "zotero_api_key": zo.get("api_key") or zotero_env_api_key(),
+        "zotero_library_type": zo.get("library_type", "user"),
+        "zotero_library_id": zo.get("library_id") or os.getenv("ZOTERO_LIBRARY_ID"),
         "search_query": search.get("query"),
         "fields_of_study": search.get("fields_of_study"),
         "publication_date": search.get("publication_date"),

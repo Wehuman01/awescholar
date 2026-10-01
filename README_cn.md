@@ -72,6 +72,7 @@ awescholar 由 [aweskill](https://github.com/wehuman01/aweskill) 驱动 — 一�
 - 按标题或 DOI 搜索 Semantic Scholar 并添加论文到存档
 - 只读问答策展存档、不改动数据：关键词检索、为粘贴的摘要找相关论文、按领域生成必读清单（`reader query / related / recommend`）
 - 处理合并时被拦下的疑似预印本/正式版重复论文
+- 与你的 Zotero 文献库互通：把阅读 collection 拉进流水线，或把筛选出的论文推入 Zotero collection（先干跑预览）
 - 为策展集合生成 RSS 订阅
 - 独立重新运行任意流水线步骤，支持自定义输入
 
@@ -115,6 +116,8 @@ Semantic Scholar API key 按以下顺序读取：`--ss-api-key` 命令行参数 
 awescholar --ss-api-key "your-key" crawler search "AI agent" --limit 10
 ```
 
+Zotero API key 走同样的模式：`--zotero-api-key` 命令行参数 > config.json 的 `zotero.api_key` > 环境变量 `ZOTERO_API_KEY` > `.env` 文件。在 https://www.zotero.org/settings/keys 创建一个允许读写的 key（`zotero push` 需要）。个人库无需配置 id（key 自带归属）；群组库需设置 `zotero.library_id`。写入走 api.zotero.org 云端，桌面版 Zotero 在下次同步后可见。
+
 完整命令参考见下方[命令](#命令)。
 
 ## 详细配置
@@ -148,6 +151,11 @@ awescholar --ss-api-key "your-key" crawler search "AI agent" --limit 10
     },
     "github": {
         "token": "${GITHUB_TOKEN}"
+    },
+    "zotero": {
+        "api_key": "${ZOTERO_API_KEY}",
+        "library_type": "user",
+        "library_id": null
     },
     "search": {
         "query": "AI agent|large language model|foundation model",
@@ -282,6 +290,13 @@ awescholar reader recommend --archive data.json --field "AI for biology" --top 1
 awescholar --config config.json reader recommend --archive data.json --field "..." --llm   # LLM 排名并给出理由
 awescholar reader stats --archive data.json           # 存档统计
 awescholar reader stats --archive data.json --category "AI Agents"   # 单分类统计（可重复）
+
+# Zotero 文献库交换 —— 个人阅读库作为流水线的输入/输出
+awescholar zotero pull --collection "Reading List"    # collection -> zotero_papers.json，喂给 `updater update`（只读）
+awescholar zotero pull --collection "DROMA" -o papers.json --category "AI Agents"   # 自定义输出文件和分类
+awescholar zotero push --archive data.json --collection "2605 月报"     # 干跑：分类防重 + 写 zotero_review.json
+awescholar zotero push --archive data.json --collection "2605 月报" --apply    # 把 to-add 条目真正写入 Zotero
+awescholar zotero push --archive data.json --collection "2605" --category "AI Agents" --tag must-read --apply
 ```
 
 每个子命令都支持 `--input`（report 用位置参数）指定输入文件，无需重跑完整流水线即可独立执行任意步骤。
@@ -333,6 +348,8 @@ awescholar verify --agentx
 `render readme` 只更新 `<!-- AWESCHOLAR:START -->` 和 `<!-- AWESCHOLAR:END -->` 之间的自动生成区域。这个区域包含 awescholar 生成的目录和分类表格。自定义标题、引用和项目介绍应放在 marker 外。已有 README 如果没有这些 marker，会直接报错，避免整文件覆盖。如果 README 还不存在，`--title` 用来控制生成文件的一级标题。
 
 `updater publish-scan` 是合并期去重的主动镜像：不等正式版作为新数据撞进来，而是主动扫描库内的预印本（按预印本服务器 DOI 前缀或 venue 识别 —— 新旧 bioRxiv/medRxiv、arXiv、ChemRxiv、Research Square、Preprints.org、Authorea、SSRN），逐条经四通道查证 —— Semantic Scholar 按 DOI、S2 模糊标题检索、Crossref `query.title`、再走作者轨迹轮（预印本与正式版标题漂移是常态："AlphaFold3" vs "AlphaFold 3"；彻底改题则击穿一切标题信号 —— 数据库极少关联两个 DOI，但作者名单不变，扫描改挖预印本第一/末位作者自己的论文列表，找作者名单高度重合的已发表工作，以重合度加弱标题或摘要佐证为门）—— 标题匹配的候选需同时过相似度门槛和非空 venue 门槛（挡掉复用原题的 ResearchHub 之类转载副本）—— 把可升级项排进存档旁的 `publish_review.json`。默认 dry run；`--apply` 原地升级 —— venue、DOI、paperUrl、年份、作者、引用切换为正式版，分类、codeUrl、githubStars、domain、affiliation 原样保留 —— `--review <file> --apply` 只应用已审阅队列不重扫，归档在扫描后若有变动会按 DOI 重新定位条目。`--pair 预印本 正式版` 为扫描无法证明的改题孪生手工排队升级。同一套修正后的预印本识别，也让 `updater dedupe --keep published` 在裁决时能正确让期刊版压过 bioRxiv 预印本。
+
+`zotero` 命令组把策展流水线和你的个人 Zotero 文献库接通（走 api.zotero.org 云端 API，无需本机运行 Zotero）。`zotero pull` 把一个 collection 映射为流水线记录格式（`--category` 指定归类，默认 `Zotero`），直接喂给 `updater update --direction new2old`；collection 里同时存在预印本和正式版时，由 updater 现成的去重机制拦下，pull 自身不需要重复造。`zotero push` 是月末的镜像：把存档（或 `--category` 子集）逐条对照整个文献库按 DOI → 规范化标题防重 —— `already-in-collection`（已在目标 collection，跳过）、`in-library`（在库内别处，只报告、绝不强行拉入 collection）、`to-add`（待新增）—— 分类结果写入存档旁的 `zotero_review.json`，只有 `--apply` 才真正创建缺失条目（collection 不存在时一并创建；每条打上 `awescholar` + 存档分类 + `--tag` 额外标签；预印本 venue 映射为 Zotero `preprint` 类型，其余为 `journalArticle`；作者按单字段 creator 原样写入，不做拆名臆测）。写入使用一次性 `Zotero-Write-Token` 单发请求，重复执行 `--apply` 幂等 —— 已创建的条目会归类为 already-in-collection；写入都在云端，桌面版 Zotero 下次同步即可见。
 
 当不指定 `--readme` 时，`render readme` 会自动发现当前工作目录下所有包含 `<!-- AWESCHOLAR:START -->` 标记的 `README*.md` / `readme*.md` 文件并逐一更新。这适用于维护多语言 README（如 `readme.md` + `README.zh-CN.md`）— 表格内容自动保持同步。
 

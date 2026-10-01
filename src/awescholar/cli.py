@@ -576,6 +576,109 @@ def cmd_add(args: argparse.Namespace, config: dict) -> int | None:
     add_interactive(archive_path=args.archive, categories=config.get("categories"))
 
 
+def cmd_zotero_pull(args: argparse.Namespace, config: dict) -> int | None:
+    """Zotero collection → pipeline JSON, ready for `updater update`."""
+    from .zotero import DEFAULT_PULL_CATEGORY, DEFAULT_PULL_FILENAME, pull_collection
+
+    api_key = _zotero_api_key(args, config)
+    if not api_key:
+        return 1
+    try:
+        result = pull_collection(
+            args.collection, api_key,
+            config.get("zotero_library_type") or "user",
+            config.get("zotero_library_id"),
+            category=args.category or DEFAULT_PULL_CATEGORY,
+            limit=args.limit)
+    except ValueError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        return 1
+
+    output = args.output or DEFAULT_PULL_FILENAME
+    with open(output, "w", encoding="utf-8") as f:
+        json.dump({result["category"]: result["records"]}, f,
+                  indent=2, ensure_ascii=False)
+    print(f"Pulled {len(result['records'])} item(s) from '{args.collection}' "
+          f"into {output} (category '{result['category']}')")
+    if result["records"]:
+        print(f"Next : awescholar updater update --direction new2old "
+              f"--input {output} --archive <your data.json>")
+    return 0
+
+
+def cmd_zotero_push(args: argparse.Namespace, config: dict) -> int | None:
+    """Archive → Zotero collection. Dry run by default; --apply writes."""
+    from .zotero import DEFAULT_REVIEW_FILENAME, push_records
+
+    api_key = _zotero_api_key(args, config)
+    if not api_key:
+        return 1
+    if not args.archive:
+        print("Error: --archive is required", file=sys.stderr)
+        return 1
+    try:
+        with open(args.archive, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except (OSError, json.JSONDecodeError) as exc:
+        print(f"Error: cannot read {args.archive}: {exc}", file=sys.stderr)
+        return 1
+
+    wanted = {c for c in (args.category or []) if c}
+    records = [
+        (category, paper)
+        for category, papers in data.items()
+        if not wanted or category in wanted
+        for paper in papers
+    ]
+    if not records:
+        print("Nothing to push"
+              + (f" for categor{'y' if len(wanted) == 1 else 'ies'} "
+                 f"{', '.join(sorted(wanted))}" if wanted else "")
+              + f" in {args.archive}")
+        return 0
+
+    review_path = args.review or os.path.join(
+        os.path.dirname(args.archive) or ".", DEFAULT_REVIEW_FILENAME)
+    try:
+        result = push_records(
+            records, args.collection, api_key,
+            config.get("zotero_library_type") or "user",
+            config.get("zotero_library_id"),
+            apply=args.apply, tags=args.tag or (), review_path=review_path)
+    except ValueError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        return 1
+
+    counts = result["counts"]
+    print(f"Collection '{result['collection']}' on {result['library']}:")
+    print(f"  to add               : {counts.get('to-add', 0)}")
+    print(f"  already in collection: {counts.get('already-in-collection', 0)}")
+    print(f"  in library elsewhere : {counts.get('in-library', 0)}")
+    if not args.apply:
+        if counts.get("to-add", 0):
+            print(f"Dry run — review {result['reviewPath']}, "
+                  "then rerun with --apply")
+        return 0
+    if not result["collectionKey"]:
+        print("Error: collection could not be created or found; "
+              "nothing was written", file=sys.stderr)
+        return 1
+    print(f"Created {result['created']} item(s) in Zotero")
+    for failure in result["failures"]:
+        print(f"  Warning: {failure}", file=sys.stderr)
+    return 0
+
+
+def _zotero_api_key(args: argparse.Namespace, config: dict) -> str | None:
+    from .config import warn_missing_zotero_key
+
+    key = (getattr(args, "zotero_api_key", None) or config.get("zotero_api_key"))
+    if not key:
+        warn_missing_zotero_key()
+        return None
+    return key
+
+
 def cmd_verify(args: argparse.Namespace, config: dict) -> int | None:
     """Offline artifact gate — no network, no writes; CI runs this on PRs."""
     from .agentx.snapshot import read_snapshot
@@ -996,6 +1099,44 @@ def main(argv: list[str] | None = None, prog: str = "awescholar") -> int:
                    help="Restrict to one or more categories (default: all categories in the archive)")
     p.add_argument("--json", action="store_true", help="Machine-readable output for agents")
 
+    # zotero — exchange with the reader's personal Zotero library
+    zotero = sub.add_parser("zotero", help="Zotero library exchange: pull a collection "
+                                           "into pipeline JSON, push an archive into a collection")
+    zotero.add_argument("--zotero-api-key", type=str,
+                        help="Zotero Web API key (default: config zotero.api_key / ZOTERO_API_KEY)")
+    zotero.add_argument("--zotero-library-type", choices=["user", "group"], default=None,
+                        help="Zotero library to read/write (default: user)")
+    zotero.add_argument("--zotero-library-id", type=str,
+                        help="Library id (a user library resolves it from the key; "
+                             "a group library requires it)")
+    zotero_sub = zotero.add_subparsers(dest="zotero_command")
+
+    p = zotero_sub.add_parser("pull", help="Map one Zotero collection into pipeline JSON "
+                                           "for `updater update` (read-only, never creates)")
+    p.add_argument("--collection", type=str, required=True, help="Zotero collection name")
+    p.add_argument("-o", "--output", type=str, default=None,
+                   help="Output JSON path (default: zotero_papers.json)")
+    p.add_argument("--category", type=str, default=None,
+                   help="Category key for the output records (default: Zotero)")
+    p.add_argument("--limit", type=int, default=None,
+                   help="Cap the number of pulled records")
+
+    p = zotero_sub.add_parser("push", help="Push archive records into a Zotero collection "
+                                           "(dry run by default; --apply writes)")
+    p.add_argument("--archive", type=str, required=True,
+                   help="Path to the project data JSON")
+    p.add_argument("--collection", type=str, required=True,
+                   help="Target Zotero collection name (created on --apply when missing)")
+    p.add_argument("--category", type=str, action="append",
+                   help="Restrict to one archive category (repeatable; default: all)")
+    p.add_argument("--tag", type=str, action="append",
+                   help="Extra Zotero tag to attach (repeatable; every item also "
+                        "gets 'awescholar' plus its archive category)")
+    p.add_argument("--apply", action="store_true",
+                   help="Create the 'to-add' items in Zotero (default: dry run + review file)")
+    p.add_argument("--review", type=str,
+                   help="Review queue path (default: zotero_review.json next to the archive)")
+
     # verify — offline artifact gate (CI runs exactly this)
     p = sub.add_parser("verify", help="Offline artifact validation (no network, no writes); "
                                       "CI runs this on every PR")
@@ -1043,6 +1184,19 @@ def main(argv: list[str] | None = None, prog: str = "awescholar") -> int:
 
     if getattr(args, "github_token", None):
         config["github_token"] = args.github_token
+
+    if args.command == "zotero":
+        if not args.zotero_command:
+            zotero.print_help()
+            return 0
+        if args.zotero_api_key:
+            config["zotero_api_key"] = args.zotero_api_key
+        if args.zotero_library_type:
+            config["zotero_library_type"] = args.zotero_library_type
+        if args.zotero_library_id:
+            config["zotero_library_id"] = args.zotero_library_id
+        handlers = {"pull": cmd_zotero_pull, "push": cmd_zotero_push}
+        return handlers[args.zotero_command](args, config) or 0
 
     if args.command == "verify":
         return cmd_verify(args, config) or 0

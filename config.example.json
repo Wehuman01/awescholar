@@ -28,6 +28,11 @@
     "github": {
         "token": "${GITHUB_TOKEN}"
     },
+    "zotero": {
+        "api_key": "${ZOTERO_API_KEY}",
+        "library_type": "user",
+        "library_id": null
+    },
     "search": {
         "query": "AI agent|large language model|foundation model",
         "fields_of_study": ["Biology", "Medicine"],

@@ -72,6 +72,7 @@ Install the awescholar skill (see [Install](#install)), then just tell your agen
 - Search Semantic Scholar by title or DOI and add papers to the archive
 - Answer reader questions from the archive without touching it: keyword search, related work for a pasted abstract, must-read lists per field (`reader query / related / recommend`)
 - Resolve suspected preprint/published duplicates held back during merge
+- Exchange with your Zotero library: pull a reading collection into the pipeline, push filtered picks into a Zotero collection (dry run first)
 - Generate RSS feeds for curated collections
 - Re-run any pipeline step independently with custom input
 
@@ -115,6 +116,8 @@ The Semantic Scholar API key is resolved in this order: `--ss-api-key` CLI flag 
 awescholar --ss-api-key "your-key" crawler search "AI agent" --limit 10
 ```
 
+The Zotero API key follows the same pattern: `--zotero-api-key` CLI flag > `zotero.api_key` in config.json > `ZOTERO_API_KEY` environment variable > `.env` files. Create one at https://www.zotero.org/settings/keys with read/write access for `zotero push`. A user library needs no id (the key knows its owner); a group library sets `zotero.library_id`. Zotero writes land on api.zotero.org, so the desktop app sees them after its next sync.
+
 See [Commands](#commands) below for the full CLI reference.
 
 ## Detailed Config
@@ -148,6 +151,11 @@ Copy `config.example.json` from the [repo root](https://github.com/wehuman01/awe
     },
     "github": {
         "token": "${GITHUB_TOKEN}"
+    },
+    "zotero": {
+        "api_key": "${ZOTERO_API_KEY}",
+        "library_type": "user",
+        "library_id": null
     },
     "search": {
         "query": "AI agent|large language model|foundation model",
@@ -288,6 +296,13 @@ awescholar reader recommend --archive data.json --field "AI for biology" --top 1
 awescholar --config config.json reader recommend --archive data.json --field "..." --llm   # LLM-ranked with reasons
 awescholar reader stats --archive data.json           # Archive statistics
 awescholar reader stats --archive data.json --category "AI Agents"   # Stats for one category (repeatable)
+
+# Zotero library exchange — the reader's personal library as pipeline input/output
+awescholar zotero pull --collection "Reading List"    # Collection -> zotero_papers.json for `updater update` (read-only)
+awescholar zotero pull --collection "DROMA" -o papers.json --category "AI Agents"   # Custom output/category
+awescholar zotero push --archive data.json --collection "2605 Monthly"   # Dry run: classify + write zotero_review.json
+awescholar zotero push --archive data.json --collection "2605 Monthly" --apply    # Create the to-add items in Zotero
+awescholar zotero push --archive data.json --collection "2605" --category "AI Agents" --tag must-read --apply
 ```
 
 ## AgentX hub
@@ -342,6 +357,8 @@ The filter step gates on scope before quality: papers whose subject falls outsid
 `reader` commands are the read-only face of the curated archive: keyword search (`query`), find related work for a seed paper — including one pasted from outside the archive via `--input` (`related`), must-read ranking per research field (`recommend`, offline or `--llm`), and archive statistics (`stats`). They never modify data and need no config, so an AI agent can answer "what's in my archive about X" instantly. During `updater update`, papers whose titles near-match an existing entry (the preprint-vs-published signature) are held back into `dedupe_review.json` next to the input file instead of being merged; a heavily retitled pair that dodges the title bars is still held back when its author roster almost fully overlaps; resolve them with `updater dedupe --keep newer|published|both`, or bypass detection with `--no-dedupe`.
 
 `updater publish-scan` is the proactive mirror of that flow: instead of waiting for a published version to arrive as new input and collide with the archived preprint, it scans the archive for preprints (by preprint-server DOI prefix or venue — bioRxiv/medRxiv old and new, arXiv, ChemRxiv, Research Square, Preprints.org, Authorea, SSRN), verifies each through three channels — Semantic Scholar by DOI, fuzzy S2 title search, then Crossref `query.title` (title drift between preprint and version of record is the norm: "AlphaFold3" vs "AlphaFold 3"), with title-matched candidates gated by dedupe-grade similarity plus a non-empty venue so repost copies never win — and queues upgrades into `publish_review.json` next to the archive. The dry run is the default; `--apply` upgrades in place — venue, DOI, paperUrl, year, authors and citations switch to the version of record while category, codeUrl, githubStars, domain and affiliation stay — and `--review <file> --apply` applies a reviewed queue without rescanning. `--pair PREPRINT PUBLISHED` queues a manual upgrade for retitled twins the scan cannot prove. The same fixed preprint detection lets `updater dedupe --keep published` correctly prefer a journal version over a bioRxiv preprint.
+
+`zotero` connects the curation pipeline to the reader's personal Zotero library through the Zotero Web API (api.zotero.org — no local Zotero needed). `zotero pull` maps one collection into the pipeline record shape (`{category: [papers]}` under `--category`, default `Zotero`), ready for `updater update --direction new2old`; preprint/published twins inside the pull are held back by the updater's usual dedupe, so pull never needs its own. `zotero push` is the month-end mirror: it classifies every archive record (or `--category` subset) against the whole library by DOI then normalized title — `already-in-collection` (no-op), `in-library` (exists outside the target collection — reported, membership never forced), or `to-add` — writes the queue to `zotero_review.json` next to the archive, and only `--apply` creates the missing items (collection included, tagged `awescholar` + archive category + `--tag` extras; preprint venues become Zotero `preprint` items, everything else `journalArticle`; authors ride as single-field creators, no invented name splitting). Writes are single-shot `Zotero-Write-Token` posts, rerunning `--apply` is idempotent — created items classify as already-in-collection — and everything lands cloud-side, so the desktop app picks it up on its next sync.
 
 `render readme` updates only the generated region between `<!-- AWESCHOLAR:START -->` and `<!-- AWESCHOLAR:END -->`. That generated region contains the awescholar table of contents and category tables. Keep custom headings, citation, and project text outside that region. Existing README files without those markers are rejected instead of being overwritten. If the README does not exist yet, `--title` controls the generated top-level heading.
 

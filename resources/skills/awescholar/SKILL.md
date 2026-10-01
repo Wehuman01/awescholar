@@ -38,6 +38,8 @@ Match the user's intent to a task domain, then follow the workflow below.
 | "Must-read papers for my field", "reading list", "入门必读" | Reader Recommend | `awescholar reader recommend --archive docs/data.json --field "X" --top 10` |
 | "Archive stats", "how many papers do I have" | Reader Stats | `awescholar reader stats --archive docs/data.json` |
 | "Resolve held-back duplicates", "处理重复论文" | Updater Dedupe | `awescholar updater dedupe --review output/dedupe_review.json --archive docs/data.json --keep published` |
+| "Import my Zotero reading list", "把 Zotero collection 导入流水线" | Zotero Pull | `awescholar zotero pull --collection "NAME" -o zotero_papers.json` |
+| "Push this month's picks to my Zotero", "生成 Zotero 阅读清单" | Zotero Push | `awescholar zotero push --archive docs/data.json --collection "NAME"` (dry run; add `--apply` to write) |
 
 ## First-Time Setup
 
@@ -351,6 +353,29 @@ awescholar updater publish-scan --archive docs/data.json --no-title-search
 
 Covers bioRxiv/medRxiv (old and new prefixes), Research Square, Preprints.org, ChemRxiv, Authorea, SSRN, and arXiv. Verification channels: S2 by DOI → fuzzy S2 title → Crossref `query.title`. Title matches need dedupe-grade similarity + non-empty venue. `--apply` switches venue/DOI/paperUrl/year/authors/citations and keeps category/codeUrl/githubStars/domain/affiliation.
 
+### Zotero Exchange (Pull · Push)
+
+Use when the user's personal Zotero library is the input (a reading collection worth curating into the archive) or the output (a reading list built from the archive). Talks to api.zotero.org — no local Zotero needed; desktop Zotero sees writes after its next sync.
+
+```bash
+# Collection -> pipeline JSON, then merge with the usual updater flow
+awescholar zotero pull --collection "DROMA" -o zotero_papers.json
+awescholar updater update --direction new2old --input zotero_papers.json --archive docs/data.json
+
+# Archive -> Zotero collection: dry run first, apply after review
+awescholar zotero push --archive docs/data.json --collection "2605 月报"
+awescholar zotero push --archive docs/data.json --collection "2605 月报" --apply
+
+# Scope one category, attach extra tags
+awescholar zotero push --archive docs/data.json --collection "X" --category "AI Agents" --tag must-read --apply
+```
+
+Rules:
+1. Needs a Zotero API key (read/write for push) from https://www.zotero.org/settings/keys — resolved `--zotero-api-key` > config `zotero.api_key` > env `ZOTERO_API_KEY` > `.env`. A user library needs no id; a group library sets `zotero.library_id`.
+2. `pull` is read-only and never creates a collection; output lands under `--category` (default `Zotero`). Preprint/published twins inside the pull are caught later by `updater update`'s dedupe — pull itself stays a dumb mapping.
+3. `push` classifies every record against the whole library (DOI → normalized title): `already-in-collection` (skip), `in-library` (exists elsewhere — reported only, membership never forced), `to-add`. The dry run writes `zotero_review.json` next to the archive; only `--apply` writes. `--apply` is idempotent — rerun skips what already landed.
+4. Created items are tagged `awescholar` + archive category + `--tag` extras; preprint venues become Zotero `preprint` items, others `journalArticle`; authors ride as single-field creators.
+
 ### Updater Enrich
 
 Use when papers lack GitHub links or star counts are stale. Fills empty `codeUrl` (GitHub search rounds: arXiv ID, then leading system name, then full title — a round whose candidates all fail falls through to the next; corroborated heuristic match auto-accept, ambiguous races judged by the configured LLM) and refreshes `githubStars` for every linked repo. Only empty `codeUrl` fields are filled. The star shape follows the config convention `archive.stars_style`: `numeric` (default) refreshes bare ints and migrates legacy badge-URL values; `badge` (Awesome-AI-Meets-Biology) writes `https://img.shields.io/github/stars/owner/repo` and never rewrites an existing badge to a number. `--stars-style` overrides per run.
@@ -471,6 +496,7 @@ When answering a user from reader results, keep the structure stable across sess
     "agent_models": null,
     "semantic_scholar": { "api_key": "${SEMANTIC_SCHOLAR_API_KEY}" },
     "github": { "token": "${GITHUB_TOKEN}" },
+    "zotero": { "api_key": "${ZOTERO_API_KEY}", "library_type": "user", "library_id": null },
     "search": {
         "query": "AI agent|large language model",
         "fields_of_study": ["Biology", "Medicine"],
@@ -498,6 +524,7 @@ Key fields:
 - **model_profiles**: Reusable profile map. Referenced by `model.profile` or `agent_models.*.profile`.
 - **agent_models**: Per-agent overrides for annotator/filterer/reporter. `null` = use global model.
 - **github.token**: GitHub token for `updater enrich` / `render agentx` live metrics (else env `GITHUB_TOKEN` / `--github-token`).
+- **zotero.api_key / library_type / library_id**: Zotero Web API access for `zotero pull/push` (else env `ZOTERO_API_KEY` / `--zotero-api-key`). `library_type` is `user` (default — id resolved from the key itself) or `group` (requires `library_id`).
 - **archive.stars_style**: `numeric` (default — bare ints, refreshed by enrich) or `badge` (shields.io URLs; enrich writes badges and never rewrites one to a number). CLI `--stars-style` overrides per run.
 - **pipeline.data_json_path**: Long-lived curated project data JSON. When `merge_new_to_old` is true, filtered results auto-merge here after pipeline completes.
 - **pipeline.existing_json_path**: Intermediate annotate output (`updater.json`). Different from `data_json_path`.
