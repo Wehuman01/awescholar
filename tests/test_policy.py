@@ -75,6 +75,19 @@ def test_canonical_venue_folds_punctuation_stripped_case_insensitive():
         "Methods-and-Protocols"
 
 
+def test_canonical_venue_folds_s2_journal_name_manglings():
+    # S2 calls Advanced Science "Advancement of science" (DOI prefix 10.1002/advs)
+    assert policy.canonical_venue("Advancement of science") == "Advanced-Science"
+    assert policy.canonical_venue("Advanced Science") == "Advanced-Science"
+    # S2 misspells JCST as "...Computational..." (DOI prefix 10.1007/s11390)
+    assert policy.canonical_venue(
+        "Journal of Computational Science and Technology"
+    ) == "JCST"
+    assert policy.canonical_venue(
+        "Journal of Computer Science and Technology"
+    ) == "JCST"
+
+
 def test_canonical_venue_passes_unknown_through():
     assert policy.canonical_venue(
         "Some Unknown Workshop Series"

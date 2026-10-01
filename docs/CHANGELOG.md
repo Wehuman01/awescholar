@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.3.9
+
+agentx: fold S2's mangled journal names — 'Advancement of science' → Advanced-Science, correct JCST spelling alias
+
 ## v0.3.8 - 2026-10-01
 
 ### Added

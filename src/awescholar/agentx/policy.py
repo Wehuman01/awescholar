@@ -300,9 +300,13 @@ VENUE_ALIASES: dict[str, str] = {
     "Journal of chemical information and modeling": "JCIM",
     "IEEE transactions on bio-medical engineering": "IEEE-TBME",
     "Bioinform.": "Bioinformatics",
+    "Journal of Computer Science and Technology": "JCST",
+    # S2's misspelling of the JCST name (kept so enrichment backfills fold)
     "Journal of Computational Science and Technology": "JCST",
     # S2's misspelling of Advanced Materials (DOI prefix 10.1002/adma)
     "Advances in Materials": "Advanced-Materials",
+    # S2's mangled venue name for Advanced Science (DOI prefix 10.1002/advs)
+    "Advancement of science": "Advanced-Science",
     # conference findings tracks
     "Findings of ACL 2026": "ACL-Findings",
     "Findings of the Association for Computational Linguistics: ACL 2026":
