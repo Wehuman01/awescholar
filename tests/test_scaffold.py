@@ -168,3 +168,30 @@ def test_update_readme_counts_leaves_unknown_categories_untouched():
             f.write("- 🌟 [Unknown Cat](http://s.example/#unknown-cat) — 57 papers\n")
         update_readme_counts(archive_path=archive, readme_path=readme)
         assert "— 57 papers" in _read(readme)
+
+
+def test_update_readme_counts_matches_shorter_anchor_by_prefix():
+    # the website section id ("#databases") is shorter than the category slug
+    # ("databases-simulation") — the bullet must still refresh
+    with tempfile.TemporaryDirectory() as tmp:
+        archive = os.path.join(tmp, "data.json")
+        _write_archive(archive, {"Databases/Simulation": [{"title": "d1"}, {"title": "d2"}]})
+        readme = os.path.join(tmp, "readme.md")
+        with open(readme, "w", encoding="utf-8") as f:
+            f.write("- 💾 [Databases/Simulation](http://s.example/#databases) — 999 papers\n")
+        update_readme_counts(archive_path=archive, readme_path=readme)
+        assert "— 2 papers" in _read(readme)
+
+
+def test_update_readme_counts_leaves_ambiguous_prefix_untouched():
+    with tempfile.TemporaryDirectory() as tmp:
+        archive = os.path.join(tmp, "data.json")
+        _write_archive(archive, {
+            "Databases/Simulation": [{"title": "d1"}],
+            "Databases/Other": [{"title": "d2"}],
+        })
+        readme = os.path.join(tmp, "readme.md")
+        with open(readme, "w", encoding="utf-8") as f:
+            f.write("- 💾 [Databases](http://s.example/#databases) — 57 papers\n")
+        update_readme_counts(archive_path=archive, readme_path=readme)
+        assert "— 57 papers" in _read(readme)

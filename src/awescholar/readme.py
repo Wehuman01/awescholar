@@ -337,9 +337,15 @@ def update_readme_counts(archive_path: str, readme_path: str) -> str:
     # bullets like "- 🌟 [AI Agents](http://site/#ai-agents) — 12 papers" (or "篇", optional trailing text)
     def _bullet_repl(match: re.Match) -> str:
         slug = match.group("slug")
-        if slug not in slug_counts:
-            return match.group(0)
-        count = slug_counts[slug]
+        if slug in slug_counts:
+            count = slug_counts[slug]
+        else:
+            # README anchors carry the website's section id, which can be shorter
+            # than the category-derived slug ("Databases/Simulation" -> "#databases").
+            prefixes = [s for s in slug_counts if s.startswith(slug + "-")]
+            if len(prefixes) != 1:
+                return match.group(0)
+            count = slug_counts[prefixes[0]]
         if "篇" in match.group("unit"):
             unit = " 篇"
         else:
