@@ -555,3 +555,21 @@ def test_search_by_doi_returns_none_when_all_sources_miss(MockSS, _mock_crossref
     monkeypatch.chdir(tmp_path)
 
     assert search_by_doi("10.2000/unknown", mock_client) is None
+
+
+def test_paper_to_record_carries_open_access_pdf_twin():
+    """Journal DOI wins, but S2's green-OA URL rides along for zotero pdf."""
+    from types import SimpleNamespace
+
+    from awescholar.record import _paper_to_record
+
+    paper = SimpleNamespace(
+        paperId="p1", title="T", venue="ACM Computing Surveys", year=None,
+        publicationDate=None, authors=[SimpleNamespace(name="A B", authorId="x")],
+        externalIds={"DOI": "10.1145/3845596", "ArXiv": "2502.05151"},
+        url=None, journal=None, citationCount=0, abstract="",
+        openAccessPdf=SimpleNamespace(url="https://arxiv.org/pdf/2502.05151",
+                                      status="GREEN"))
+    record = _paper_to_record(paper)
+    assert record["doi"] == "10.1145/3845596"
+    assert record["openAccessPdf"] == "https://arxiv.org/pdf/2502.05151"

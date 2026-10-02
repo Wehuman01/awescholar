@@ -34,6 +34,12 @@ def _get_client(api_key: str | None = None) -> SemanticScholar:
     return SemanticScholar(api_key=key) if key else SemanticScholar()
 
 
+def _open_access_pdf_url(paper) -> str:
+    """S2 openAccessPdf.url as a plain string ('' when absent or not a string)."""
+    url = getattr(getattr(paper, "openAccessPdf", None), "url", None)
+    return url if isinstance(url, str) else ""
+
+
 def _paper_to_record(paper) -> dict | None:
     if not paper:
         return None
@@ -98,6 +104,13 @@ def _paper_to_record(paper) -> dict | None:
         "doi": doi,
         # Temporary: stripped from records before persisting (archive has no abstract field).
         "abstract": getattr(paper, "abstract", None) or "",
+        # Temporary, same rule as abstract: the green-OA twin URL S2 knows
+        # (often the arXiv PDF of a published paper) — consumed by zotero pdf.
+        # The isinstance guard keeps mock papers (tests) and odd payloads out.
+        "openAccessPdf": _open_access_pdf_url(paper),
+        # Temporary: the arXiv id rides along even when a journal DOI won,
+        # so the OA finder can reach the green twin of a paywalled version.
+        "arxiv": arxiv_id if isinstance(arxiv_id, str) else "",
     }
 
 
@@ -110,7 +123,7 @@ def search_by_title(title: str, sch: SemanticScholar) -> dict | None:
             title, limit=1, match_title=True,
             fields=["paperId", "title", "venue", "year",
                     "publicationDate", "authors", "externalIds", "url", "journal",
-                    "citationCount", "abstract"],
+                    "citationCount", "abstract", "openAccessPdf"],
         )
         return _paper_to_record(paper)
     except Exception as e:  # noqa: BLE001 — one failed lookup must not abort the batch
@@ -128,7 +141,7 @@ def search_by_paper_id(paper_id: str, sch: SemanticScholar) -> dict | None:
             paper_id,
             fields=["paperId", "title", "venue", "year",
                     "publicationDate", "authors", "externalIds", "url", "journal",
-                    "citationCount", "abstract"],
+                    "citationCount", "abstract", "openAccessPdf"],
         )
         rec = _paper_to_record(paper)
         if rec and rec.get("title"):
@@ -277,7 +290,7 @@ def search_by_doi(doi: str, sch: SemanticScholar) -> dict | None:
             f"DOI:{doi}",
             fields=["paperId", "title", "venue", "year",
                     "publicationDate", "authors", "externalIds", "url", "journal",
-                    "citationCount", "abstract"],
+                    "citationCount", "abstract", "openAccessPdf"],
         )
         rec = _paper_to_record(paper)
         if rec and rec.get("title"):

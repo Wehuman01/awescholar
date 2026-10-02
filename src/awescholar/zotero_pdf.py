@@ -95,32 +95,55 @@ def arxiv_pdf_url(doi: str) -> str | None:
     return f"https://arxiv.org/pdf/{match.group(1)}" if match else None
 
 
-def unpaywall_pdf_url(doi: str, email: str) -> str | None:
-    """Best OA location from Unpaywall; None on any failure or closed access."""
+def unpaywall_pdf_urls(doi: str, email: str) -> list[str]:
+    """All Unpaywall OA locations, direct PDF links before landing pages.
+
+    best_oa_location often points at a DOI landing page while another
+    oa_location carries the repository PDF (e.g. the arXiv twin of a
+    hybrid-OA journal paper), so every location is kept and the download
+    layer's %PDF validation picks the one that is really a file.
+    """
     url = f"{UNPAYWALL_BASE}/{doi}?email={email}"
     req = urllib.request.Request(url, headers={"User-Agent": "awescholar"})
     try:
         with urllib.request.urlopen(req, timeout=DOWNLOAD_TIMEOUT) as resp:
             data = json.loads(resp.read().decode("utf-8"))
     except (urllib.error.URLError, json.JSONDecodeError, OSError):
-        return None
-    location = (data.get("best_oa_location") or {})
-    return location.get("url_for_pdf") or location.get("url") or None
+        return []
+    locations = list(data.get("oa_locations") or [])
+    best = data.get("best_oa_location")
+    if best and best not in locations:
+        locations.insert(0, best)
+    pdf_links, landing = [], []
+    for loc in locations:
+        direct = loc.get("url_for_pdf")
+        if direct:
+            pdf_links.append(direct)
+        elif loc.get("url"):
+            landing.append(loc["url"])  # a location's landing page only when it has no direct link
+    return [u for u in (*pdf_links, *landing) if isinstance(u, str)]
 
 
 def candidate_pdf_urls(record: dict, email: str | None) -> list[str]:
-    """Ordered, de-duplicated candidates: Unpaywall first, arXiv DOI second."""
+    """Ordered, de-duplicated candidates for one record.
+
+    Unpaywall locations first (publisher copy when the DOI is OA), then the
+    Semantic Scholar ``openAccessPdf`` URL, then the arXiv direct link —
+    derived from the DataCite arXiv DOI or from the arXiv twin S2 recorded
+    beside a journal DOI (the green copy behind a paywalled version).
+    """
     doi = str(record.get("doi") or "").strip()
-    if not doi:
-        return []
+    s2_url = str(record.get("openAccessPdf") or "").strip()
+    arxiv_id = str(record.get("arxiv") or "").strip()
     candidates: list[str] = []
-    if email:
-        url = unpaywall_pdf_url(doi, email)
-        if url:
-            candidates.append(url)
-    url = arxiv_pdf_url(doi)
-    if url:
-        candidates.append(url)
+    if doi and email:
+        candidates.extend(unpaywall_pdf_urls(doi, email))
+    if s2_url:
+        candidates.append(s2_url)
+    direct = arxiv_pdf_url(doi) or (
+        f"https://arxiv.org/pdf/{arxiv_id}" if arxiv_id else None)
+    if direct:
+        candidates.append(direct)
     return list(dict.fromkeys(candidates))
 
 

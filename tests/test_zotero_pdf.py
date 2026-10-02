@@ -1,6 +1,7 @@
 """Tests for zotero_pdf.py — PoW solving, OA candidates, download policy, connector flow."""
 
 import hashlib
+import json
 
 import pytest
 
@@ -70,26 +71,33 @@ def test_arxiv_pdf_url_from_datacite_doi():
     assert zotero_pdf.arxiv_pdf_url("") is None
 
 
-def test_unpaywall_pdf_url_prefers_url_for_pdf(monkeypatch):
+def test_unpaywall_urls_direct_links_before_landing_pages(monkeypatch):
+    payload = json.dumps({
+        "best_oa_location": {"url": "https://doi.org/10.1145/x"},
+        "oa_locations": [
+            {"url": "https://doi.org/10.1145/x"},
+            {"url_for_pdf": "https://arxiv.org/pdf/2502.05151", "url": "https://arxiv.org/abs/2502.05151"},
+        ]})
+
     def fake_urlopen(req, timeout=None):
-        payload = '{"best_oa_location": {"url_for_pdf": "https://x.org/a.pdf", "url": "https://x.org/a"}}'
         return _FakeResponse(200, payload)
 
     monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
-    assert (zotero_pdf.unpaywall_pdf_url("10.1/x", "a@b.c")
-            == "https://x.org/a.pdf")
+    assert zotero_pdf.unpaywall_pdf_urls("10.1145/x", "a@b.c") == [
+        "https://arxiv.org/pdf/2502.05151", "https://doi.org/10.1145/x"]
 
 
-def test_unpaywall_pdf_url_swallows_failures(monkeypatch):
+def test_unpaywall_urls_swallows_failures(monkeypatch):
     def fake_urlopen(req, timeout=None):
         raise OSError("down")
 
     monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
-    assert zotero_pdf.unpaywall_pdf_url("10.1/x", "a@b.c") is None
+    assert zotero_pdf.unpaywall_pdf_urls("10.1/x", "a@b.c") == []
 
 
 def test_candidate_urls_order_and_no_email(monkeypatch):
-    monkeypatch.setattr(zotero_pdf, "unpaywall_pdf_url", lambda doi, email: "https://x.org/a.pdf")
+    monkeypatch.setattr(zotero_pdf, "unpaywall_pdf_urls",
+                        lambda doi, email: ["https://x.org/a.pdf"])
     record = {"doi": "10.48550/arXiv.2505.10468"}
     assert zotero_pdf.candidate_pdf_urls(record, "a@b.c") == [
         "https://x.org/a.pdf", "https://arxiv.org/pdf/2505.10468"]
@@ -97,6 +105,23 @@ def test_candidate_urls_order_and_no_email(monkeypatch):
     assert zotero_pdf.candidate_pdf_urls(record, None) == [
         "https://arxiv.org/pdf/2505.10468"]
     assert zotero_pdf.candidate_pdf_urls({"doi": ""}, "a@b.c") == []
+
+
+def test_candidate_urls_green_twin_behind_journal_doi(monkeypatch):
+    """Journal DOI whose publisher copy is a landing page: the arXiv twin
+    arrives both through Unpaywall locations and the record's arXiv id."""
+    monkeypatch.setattr(zotero_pdf, "unpaywall_pdf_urls", lambda doi, email: [])
+    record = {"doi": "10.1145/3845596", "arxiv": "2502.05151"}
+    assert zotero_pdf.candidate_pdf_urls(record, "a@b.c") == [
+        "https://arxiv.org/pdf/2502.05151"]
+
+    # Unpaywall's direct links stay ahead of the twin.
+    monkeypatch.setattr(
+        zotero_pdf, "unpaywall_pdf_urls",
+        lambda doi, email: ["https://dl.acm.org/a.pdf", "https://doi.org/10.1145/3845596"])
+    assert zotero_pdf.candidate_pdf_urls(record, "a@b.c") == [
+        "https://dl.acm.org/a.pdf", "https://doi.org/10.1145/3845596",
+        "https://arxiv.org/pdf/2502.05151"]
 
 
 # ── download policy ───────────────────────────────────────────

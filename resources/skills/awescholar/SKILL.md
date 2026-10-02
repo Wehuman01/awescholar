@@ -393,7 +393,7 @@ awescholar zotero pdf --by doi 10.1093/bib/bbag110 --collection agentx_paper
 awescholar zotero pdf "<title>" --out pdfs/
 ```
 
-Sources and gates: Unpaywall best OA location (needs `--unpaywall-email` or config `zotero.unpaywall_email`), arXiv DOIs direct (`10.48550/arXiv.<id>`). Downloads carry browser headers; Springer is retried with `Accept: application/pdf`; PMC's proof-of-work interstitial is solved locally (sha256 leading zeros → `cloudpmc-viewer-pow` cookie). Every file is validated by `%PDF` magic + size floor before it counts.
+Sources and gates: Unpaywall best OA location (needs `--unpaywall-email` or config `zotero.unpaywall_email`) → Semantic Scholar `openAccessPdf` (carries the green-OA arXiv twin behind paywalled journal DOIs) → direct arXiv DOI links (`10.48550/arXiv.<id>`). Downloads carry browser headers; Springer is retried with `Accept: application/pdf`; PMC's proof-of-work interstitial is solved locally (sha256 leading zeros → `cloudpmc-viewer-pow` cookie). Every file is validated by `%PDF` magic + size floor before it counts.
 
 Limits (by protocol, not by choice): the Zotero connector attaches PDFs only to items from its own save session, so attach mode always creates the item — it cannot backfill a PDF onto an existing library item (use `--out` + drag). Saves land in the collection selected in the Zotero pane, exactly like the browser extension; `--collection NAME` only guards that selection and refuses on mismatch.
 
