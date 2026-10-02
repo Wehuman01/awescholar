@@ -368,3 +368,16 @@ def test_load_config_reads_archive_stars_style(monkeypatch, tmp_path):
     config = load_config(str(config_path))
 
     assert config["stars_style"] == "badge"
+
+
+def test_load_config_reads_zotero_unpaywall_email(monkeypatch, tmp_path):
+    monkeypatch.setenv("HOME", str(tmp_path))
+    config_path = tmp_path / "config.json"
+    config_path.write_text(
+        json.dumps({"zotero": {"unpaywall_email": "peng@example.org"}}),
+        encoding="utf-8",
+    )
+
+    config = load_config(str(config_path))
+
+    assert config["zotero_unpaywall_email"] == "peng@example.org"

@@ -162,6 +162,8 @@ def load_config(path: str | None) -> dict:
         "zotero_api_key": zo.get("api_key") or zotero_env_api_key(),
         "zotero_library_type": zo.get("library_type", "user"),
         "zotero_library_id": zo.get("library_id") or os.getenv("ZOTERO_LIBRARY_ID"),
+        # Unpaywall requires a contact email; zotero pdf uses it for OA lookup.
+        "zotero_unpaywall_email": zo.get("unpaywall_email"),
         "search_query": search.get("query"),
         "fields_of_study": search.get("fields_of_study"),
         "publication_date": search.get("publication_date"),

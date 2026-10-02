@@ -40,6 +40,7 @@ Match the user's intent to a task domain, then follow the workflow below.
 | "Resolve held-back duplicates", "处理重复论文" | Updater Dedupe | `awescholar updater dedupe --review output/dedupe_review.json --archive docs/data.json --keep published` |
 | "Import my Zotero reading list", "把 Zotero collection 导入流水线" | Zotero Pull | `awescholar zotero pull --collection "NAME" -o zotero_papers.json` |
 | "Push this month's picks to my Zotero", "生成 Zotero 阅读清单" | Zotero Push | `awescholar zotero push --archive docs/data.json --collection "NAME"` (dry run; add `--apply` to write) |
+| "Find the PDF and put it in Zotero", "下这篇的全文" | Zotero PDF | `awescholar zotero pdf "<title or DOI>"` (attach) / `awescholar zotero pdf ... --out pdfs/` (files) |
 
 ## First-Time Setup
 
@@ -375,6 +376,26 @@ Rules:
 2. `pull` is read-only and never creates a collection; output lands under `--category` (default `Zotero`). Preprint/published twins inside the pull are caught later by `updater update`'s dedupe — pull itself stays a dumb mapping.
 3. `push` classifies every record against the whole library (DOI → normalized title): `already-in-collection` (skip), `in-library` (exists elsewhere — reported only, membership never forced), `to-add`. The dry run writes `zotero_review.json` next to the archive; only `--apply` writes. `--apply` is idempotent — rerun skips what already landed.
 4. Created items are tagged `awescholar` + archive category + `--tag` extras; preprint venues become Zotero `preprint` items, others `journalArticle`; authors ride as single-field creators.
+
+### Zotero PDF (find full text · attach)
+
+Use when the user wants a paper's PDF — resolved from a title or DOI, fetched from open access, and either saved into the running Zotero desktop (item + attachment) or written to a directory. Works paper-by-paper from arbitrary queries; this is not the archive-batch flow (`updater download` handles that).
+
+```bash
+# Resolve by title (Semantic Scholar), fetch the OA PDF, save item+PDF into
+# the collection currently selected in the Zotero pane
+awescholar zotero pdf "Transforming Science with Large Language Models"
+
+# By DOI; refuse to save unless the named collection is selected in Zotero
+awescholar zotero pdf --by doi 10.1093/bib/bbag110 --collection agentx_paper
+
+# Files only — no Zotero needed (use for items that already exist; drag to attach)
+awescholar zotero pdf "<title>" --out pdfs/
+```
+
+Sources and gates: Unpaywall best OA location (needs `--unpaywall-email` or config `zotero.unpaywall_email`), arXiv DOIs direct (`10.48550/arXiv.<id>`). Downloads carry browser headers; Springer is retried with `Accept: application/pdf`; PMC's proof-of-work interstitial is solved locally (sha256 leading zeros → `cloudpmc-viewer-pow` cookie). Every file is validated by `%PDF` magic + size floor before it counts.
+
+Limits (by protocol, not by choice): the Zotero connector attaches PDFs only to items from its own save session, so attach mode always creates the item — it cannot backfill a PDF onto an existing library item (use `--out` + drag). Saves land in the collection selected in the Zotero pane, exactly like the browser extension; `--collection NAME` only guards that selection and refuses on mismatch.
 
 ### Updater Enrich
 

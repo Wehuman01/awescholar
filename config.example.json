@@ -37,7 +37,8 @@
     "zotero": {
         "api_key": "${ZOTERO_API_KEY}",
         "library_type": "user",
-        "library_id": null
+        "library_id": null,
+        "unpaywall_email": "you@example.org"
     },
     "search": {
         "query": "AI agent|large language model|foundation model",

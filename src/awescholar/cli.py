@@ -688,6 +688,24 @@ def _zotero_api_key(args: argparse.Namespace, config: dict) -> str | None:
     return key
 
 
+def cmd_zotero_pdf(args: argparse.Namespace, config: dict) -> int | None:
+    """Title/DOI → OA PDF → files (--out) or item+PDF in the running Zotero."""
+    from . import zotero_pdf
+
+    email = args.unpaywall_email or config.get("zotero_unpaywall_email")
+    if not email:
+        print("Warning: no --unpaywall-email / config zotero.unpaywall_email — "
+              "Unpaywall skipped; only arXiv DOI links remain.",
+              file=sys.stderr)
+    stats = zotero_pdf.run(
+        args.queries, by=args.by, out_dir=args.out,
+        collection=args.collection, unpaywall_email=email,
+        ss_api_key=config.get("ss_api_key"))
+    if stats["not_found"] or stats["no_pdf"] or stats.get("zotero", {}).get("failures"):
+        return 1
+    return 0
+
+
 def cmd_verify(args: argparse.Namespace, config: dict) -> int | None:
     """Offline artifact gate — no network, no writes; CI runs this on PRs."""
     from .agentx.snapshot import read_snapshot
@@ -1148,6 +1166,21 @@ def main(argv: list[str] | None = None, prog: str = "awescholar") -> int:
     p.add_argument("--review", type=str,
                    help="Review queue path (default: zotero_review.json next to the archive)")
 
+    p = zotero_sub.add_parser("pdf", help="Find open-access PDFs by title/DOI; save into "
+                                          "the running Zotero desktop, or --out DIR for files only")
+    p.add_argument("queries", nargs="+", metavar="QUERY",
+                   help="Paper titles or DOIs")
+    p.add_argument("--by", choices=["title", "doi"], default="title",
+                   help="Interpret queries as titles or DOIs (default: title)")
+    p.add_argument("--out", type=str, metavar="DIR",
+                   help="Write the PDFs into this directory instead of Zotero "
+                        "(no Zotero needed; attach by drag for existing items)")
+    p.add_argument("--collection", type=str, metavar="NAME",
+                   help="Refuse to save unless this collection is selected in Zotero "
+                        "(the save lands in the selected collection, like the browser extension)")
+    p.add_argument("--unpaywall-email", type=str,
+                   help="Email for the Unpaywall API (default: config zotero.unpaywall_email)")
+
     # verify — offline artifact gate (CI runs exactly this)
     p = sub.add_parser("verify", help="Offline artifact validation (no network, no writes); "
                                       "CI runs this on every PR")
@@ -1206,7 +1239,8 @@ def main(argv: list[str] | None = None, prog: str = "awescholar") -> int:
             config["zotero_library_type"] = args.zotero_library_type
         if args.zotero_library_id:
             config["zotero_library_id"] = args.zotero_library_id
-        handlers = {"pull": cmd_zotero_pull, "push": cmd_zotero_push}
+        handlers = {"pull": cmd_zotero_pull, "push": cmd_zotero_push,
+                    "pdf": cmd_zotero_pdf}
         return handlers[args.zotero_command](args, config) or 0
 
     if args.command == "verify":

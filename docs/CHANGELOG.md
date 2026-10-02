@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.3.10
+
+new `awescholar zotero pdf` — resolve titles/DOIs via Semantic Scholar, fetch the open-access PDF (Unpaywall, with arXiv DOI links; Springer retried with `Accept: application/pdf`; PMC's proof-of-work interstitial solved locally and presented as the `cloudpmc-viewer-pow` cookie), then either write the files (`--out DIR`) or save item+PDF into the running Zotero desktop through its connector server (`saveItems` + `saveAttachment`). Two honest limits: the connector attaches only to items from its own save session (no backfilling PDFs onto existing items — use `--out` + drag), and saves land in the collection selected in the Zotero pane (`--collection NAME` guards the selection). Unpaywall email comes from `--unpaywall-email` / config `zotero.unpaywall_email`.
+
 ## v0.3.9
 
 agentx: fold S2's mangled journal names — 'Advancement of science' → Advanced-Science, correct JCST spelling alias
