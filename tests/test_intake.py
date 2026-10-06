@@ -481,3 +481,23 @@ class TestAgentFromIntake:
             None,
         )
         assert agent1["slug"] == "y-agent-2"
+
+    def test_auto_venue_slug_tag_is_accepted(self, monkeypatch):
+        """An unregistered tag that is the auto slug of the record's own
+        venue passes the registry gate (it fails later at the fetch)."""
+        monkeypatch.setattr(
+            intake,
+            "fetch_repo_ex",
+            lambda repo, token: (None, False),
+        )
+        with pytest.raises(intake.IntakeError, match="Could not fetch"):
+            intake._agent_from_intake(
+                {
+                    "repo": "x/y",
+                    "category": "bio-omics",
+                    "tags": ["Cancer-Research"],
+                    "paperMeta": {"venue": "Cancer Research"},
+                },
+                set(),
+                None,
+            )

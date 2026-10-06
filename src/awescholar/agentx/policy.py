@@ -360,10 +360,73 @@ def canonical_venue(venue: str) -> str:
     return _VENUE_FOLD.get(_canonical_fold(venue.strip()), venue)
 
 
-def registered_venue_tag(venue: str) -> str | None:
-    """Registered venue tag for a paper venue, or None when it is unknown."""
+#: Free-text venue strings that name a source, not a publication venue —
+#: these never become tags (a blog post is not a venue).
+VENUE_DENY_EXACT: frozenset[str] = frozenset([
+    "technical report", "tech report", "white paper", "website",
+    "homepage", "github", "gitlab", "zenodo", "figshare", "osf",
+    "preprint", "unknown",
+])
+_VENUE_DENY_FOLD: frozenset[str] = frozenset(
+    _canonical_fold(x) for x in VENUE_DENY_EXACT
+)
+VENUE_DENY_SUBSTRINGS: tuple[str, ...] = ("blog",)
+
+#: Join words kept lower-case in auto-generated venue slugs, matching the
+#: hand-registered tags (Methods-and-Protocols, Briefings-in-Bioinformatics).
+VENUE_STOPWORDS: frozenset[str] = frozenset(
+    ["a", "an", "and", "for", "in", "of", "on", "the", "to"]
+)
+
+
+def _venue_slug(venue: str) -> str:
+    """Hyphenated tag slug from a free-text venue name.
+
+    Words that carry their own casing (AIChE, ACM) and short brand words
+    without capitals (npj) pass through untouched; stop-words stay
+    lower-case; everything else is Title-Cased.
+    """
+    words = []
+    for word in venue.split():
+        word = word.strip(".,:;()[]\"'")
+        if not word:
+            continue
+        if word.lower() in VENUE_STOPWORDS:
+            words.append(word.lower())
+        elif any(c.isupper() for c in word) or len(word) <= 3:
+            words.append(word)
+        else:
+            words.append(word[0].upper() + word[1:])
+    return "-".join(words)
+
+
+def venue_tag_for(venue: str) -> str | None:
+    """Tag for a paper venue: registered canonical tag, auto slug, or None.
+
+    Registered venues and their aliases fold to their canonical tag.
+    Unknown venues that look like a real journal or conference get an
+    auto-generated slug (npj-Health-Systems). Non-venue sources (blogs,
+    technical reports, code hosts) and slugs that would violate tag policy
+    (leading digit, generic descriptor) or collide with a registered
+    non-venue tag return None.
+    """
+    venue = venue.strip()
+    if not venue:
+        return None
     tag = canonical_venue(venue)
-    return tag if tag_type(tag) == "venue" else None
+    if tag_type(tag) == "venue":
+        return tag
+    if (
+        _canonical_fold(venue) in _VENUE_DENY_FOLD
+        or any(s in venue.lower() for s in VENUE_DENY_SUBSTRINGS)
+    ):
+        return None
+    slug = _venue_slug(venue)
+    if not slug or slug[0].isdigit() or slug in GENERIC_TAGS:
+        return None
+    if tag_type(slug) is not None:
+        return None
+    return slug
 
 
 def registered_tags() -> list[str]:

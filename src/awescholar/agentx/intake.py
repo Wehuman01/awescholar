@@ -18,7 +18,12 @@ import re
 from datetime import UTC, datetime
 from typing import Any
 
-from awescholar.agentx.policy import CATEGORIES, find_tag_policy_violations, tag_type
+from awescholar.agentx.policy import (
+    CATEGORIES,
+    find_tag_policy_violations,
+    tag_type,
+    venue_tag_for,
+)
 from awescholar.agentx.snapshot import (
     _coalesce,
     read_snapshot,
@@ -198,11 +203,17 @@ def _agent_from_intake(
             f"attributions only):\n{lines}"
         )
 
-    unregistered = [t for t in tags if tag_type(t) is None]
+    # The record's own venue tag — registered canonical or auto-generated
+    # slug — is the one unregistered tag intake accepts.
+    auto_venue_tag = venue_tag_for(
+        str((rec.get("paperMeta") or {}).get("venue") or "")
+    )
+    unregistered = [t for t in tags if tag_type(t) is None and t != auto_venue_tag]
     if unregistered:
         raise IntakeError(
             f"Unregistered tags on {repo}: {', '.join(unregistered)}. "
-            f"Add them to TAG_TYPE in agentx/policy.py first."
+            f"Add them to TAG_TYPE in agentx/policy.py first; a venue tag "
+            f"may also be the auto slug of the record's own venue."
         )
 
     # --- live GitHub fetch -----------------------------------------------------

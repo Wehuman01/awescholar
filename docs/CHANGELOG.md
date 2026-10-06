@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.3.11
+
+agentx: venue tags no longer gated on the TAG_TYPE registry — unknown journals get an auto-generated slug (npj-Health-Systems, Cancer-Research; brand casing and stop-words preserved), while non-venue sources (blogs, technical reports, code hosts) stay skipped via a deny list. `sync_venue_tags` writes the auto slugs, and validate/intake accept a record's own venue tag as the one legal unregistered tag; institution/team/tech tags remain registry-gated. Registered aliases still fold to their canonical tags, so TAG_TYPE keeps its job as the alias map, not the gate.
+
 ## v0.3.10
 
 new `awescholar zotero pdf` — resolve titles/DOIs via Semantic Scholar, fetch the open-access PDF (Unpaywall → Semantic Scholar openAccessPdf — which carries the green-OA arXiv twin behind paywalled journal DOIs — → direct arXiv DOI links; Springer retried with `Accept: application/pdf`; PMC's proof-of-work interstitial solved locally and presented as the `cloudpmc-viewer-pow` cookie), then either write the files (`--out DIR`) or save item+PDF into the running Zotero desktop through its connector server (`saveItems` + `saveAttachment`). Two honest limits: the connector attaches only to items from its own save session (no backfilling PDFs onto existing items — use `--out` + drag), and saves land in the collection selected in the Zotero pane (`--collection NAME` guards the selection). Unpaywall email comes from `--unpaywall-email` / config `zotero.unpaywall_email`.

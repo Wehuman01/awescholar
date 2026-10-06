@@ -662,3 +662,33 @@ def test_arxiv_titles_retries_rate_limit_and_maps_in_order(monkeypatch):
 
 def test_arxiv_titles_empty_ids_makes_no_request():
     assert papers_fill.arxiv_titles([]) == {}
+
+
+def test_sync_venue_tags_auto_slugs_unknown_journals(tmp_path):
+    path = _snapshot_file(
+        tmp_path,
+        [
+            _agent(
+                "npj-agent",
+                paperMeta={**_meta("", "ICDT paper", 1), "venue": "npj Health Systems"},
+            ),
+            _agent(
+                "cancer-agent",
+                paperMeta={**_meta("", "VT paper", 1), "venue": "Cancer Research"},
+            ),
+            _agent(
+                "report-agent",
+                paperMeta={**_meta("", "Report paper", 1), "venue": "Technical report"},
+            ),
+        ],
+    )
+
+    first = sync_venue_tags(path)
+    assert first == {"updated": 2, "unknown_venues_skipped": 1}
+    agents = _by_slug(path)
+    assert agents["npj-agent"]["tags"] == ["npj-Health-Systems"]
+    assert agents["cancer-agent"]["tags"] == ["Cancer-Research"]
+    assert agents["report-agent"]["tags"] == []
+
+    second = sync_venue_tags(path)
+    assert second == {"updated": 0, "unknown_venues_skipped": 1}

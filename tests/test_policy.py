@@ -121,3 +121,41 @@ def test_lifecycle_constants():
     assert policy.NURSERY_ARCHIVE_IDLE_DAYS == 180
     assert policy.ESTABLISHED_ARCHIVE_IDLE_DAYS == 3 * 365
     assert policy.AUTO_STABLE_MIN_STARS == 1000
+
+
+# --- venue_tag_for ------------------------------------------------------------
+
+def test_venue_tag_for_folds_registered_venues_and_aliases():
+    assert policy.venue_tag_for("Nature Biotechnology") == "Nature-Biotechnology"
+    assert policy.venue_tag_for("NeurIPS 2025") == "NeurIPS"
+    assert policy.venue_tag_for(
+        "Journal of Computer Science and Technology"
+    ) == "JCST"
+
+
+def test_venue_tag_for_auto_slugs_unknown_journals():
+    assert policy.venue_tag_for("Cancer Research") == "Cancer-Research"
+    # npj is a brand word without capitals — passes through untouched
+    assert policy.venue_tag_for("npj Health Systems") == "npj-Health-Systems"
+    assert policy.venue_tag_for("npj Digital Medicine") == "npj-Digital-Medicine"
+    # existing capitals (AIChE, ACM) survive; stop-words stay lower-case
+    assert policy.venue_tag_for("AIChE Journal") == "AIChE-Journal"
+    assert (
+        policy.venue_tag_for("Journal of Computer Science")
+        == "Journal-of-Computer-Science"
+    )
+
+
+def test_venue_tag_for_denies_non_venue_sources():
+    assert policy.venue_tag_for("Nvidia's blog") is None
+    assert policy.venue_tag_for("Company Blog Post") is None
+    assert policy.venue_tag_for("Technical report") is None
+    assert policy.venue_tag_for("GitHub") is None
+    assert policy.venue_tag_for("") is None
+
+
+def test_venue_tag_for_refuses_policy_violating_and_colliding_slugs():
+    # a venue starting with a digit would create a count-marketing tag
+    assert policy.venue_tag_for("2024 Workshop on Agents") is None
+    # an auto slug may not claim a registered non-venue tag's name
+    assert policy.venue_tag_for("MCP") is None

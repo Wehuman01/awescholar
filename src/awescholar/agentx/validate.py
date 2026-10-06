@@ -12,7 +12,7 @@ import json
 import re
 from datetime import datetime
 
-from .policy import CATEGORIES, find_tag_policy_violations, registered_venue_tag, tag_type
+from .policy import CATEGORIES, find_tag_policy_violations, tag_type, venue_tag_for
 
 # resolve_repo_status (transform) can emit every status below; "no-repo"
 # only ever enters through a writer, but it is protected there, so it stays
@@ -167,6 +167,15 @@ def validate_snapshot_file(file: object) -> list[str]:
             if value is not None and not _is_http_url(value):
                 problems.append(f"{spot}: {field} must be null or an http(s) URL, got {value}")
 
+        paper_meta = agent.get("paperMeta")
+        # The agent's own venue tag — registered canonical or auto-generated
+        # slug — is the one unregistered tag a record may legally carry.
+        auto_venue_tag = (
+            venue_tag_for(str(paper_meta.get("venue") or ""))
+            if isinstance(paper_meta, dict)
+            else None
+        )
+
         if "tags" in agent:
             tags = agent["tags"]
             if not isinstance(tags, list) or any(not isinstance(t, str) or not t for t in tags):
@@ -174,14 +183,15 @@ def validate_snapshot_file(file: object) -> list[str]:
             else:
                 for violation in find_tag_policy_violations(tags):
                     problems.append(f"{spot}: tag policy — {violation}")
-                unregistered = [t for t in tags if tag_type(t) is None]
+                unregistered = [
+                    t for t in tags if tag_type(t) is None and t != auto_venue_tag
+                ]
                 if unregistered:
                     problems.append(
                         f"{spot}: unregistered tag(s) {', '.join(unregistered)}"
                         " — add to TAG_TYPE in agentx/policy.py first"
                     )
 
-        paper_meta = agent.get("paperMeta")
         if paper_meta is not None:
             if not isinstance(paper_meta, dict):
                 problems.append(f"{spot}: paperMeta must be an object or null")
@@ -200,13 +210,12 @@ def validate_snapshot_file(file: object) -> list[str]:
                     value = paper_meta.get(meta_key)
                     if value is not None and not isinstance(value, str):
                         problems.append(f"{spot}: paperMeta.{meta_key} must be a string")
-                venue_tag = registered_venue_tag(str(paper_meta.get("venue") or ""))
-                tags = agent.get("tags")
-                if not isinstance(tags, list):
-                    tags = []
-                if venue_tag is not None and venue_tag not in tags:
+                tags_list = agent.get("tags")
+                if not isinstance(tags_list, list):
+                    tags_list = []
+                if auto_venue_tag is not None and auto_venue_tag not in tags_list:
                     problems.append(
-                        f"{spot}: paperMeta.venue maps to registered tag {venue_tag} "
+                        f"{spot}: paperMeta.venue maps to venue tag {auto_venue_tag} "
                         "but tags does not contain it — run `updater backfill --agentx "
                         "--fields venue-tags`"
                     )

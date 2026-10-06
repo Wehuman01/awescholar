@@ -337,9 +337,9 @@ Command mapping (old `agentx-cli` v0.1.x → `awescholar`):
 | `agentx add owner/repo --category X --tags A,B` | `awescholar updater add --agentx owner/repo --category X [--tags "A,B"] [--name] [--paper] [--homepage] [--description]` |
 | `agentx add --from-json F` | `awescholar updater add --agentx --from-json F` (batch, all-or-nothing) |
 | `agentx snapshot` | `awescholar updater enrich --agentx [--archive data/agents-snapshot.json]` (metrics + lifecycle: 404→gone, status re-derivation, retirement freeze, license fallback; `--archive` defaults to `data/agents-snapshot.json` in `--agentx` mode) |
-| `agentx enrich-papers` | `awescholar updater backfill --agentx --fields paper-meta [--refresh] [--only substring]` (also syncs registered venue tags) |
+| `agentx enrich-papers` | `awescholar updater backfill --agentx --fields paper-meta [--refresh] [--only substring]` (also syncs venue tags) |
 | `agentx refresh-citations` | `awescholar updater backfill --agentx --fields citations` |
-| — | `awescholar updater backfill --agentx --fields venue-tags [--only substring]` (sync paper venues into registered tags) |
+| — | `awescholar updater backfill --agentx --fields venue-tags [--only substring]` (sync paper venues into tags: registered canonical tag for known venues, auto-generated slug for new ones; non-venue sources are skipped) |
 | `agentx validate` | `awescholar verify --agentx` (offline invariants gate; CI runs this) |
 
 Environment variables: `GITHUB_TOKEN` (recommended), `SEMANTIC_SCHOLAR_API_KEY` or `SEMANTICSCHOLAR_API_KEY` (recommended for backfill).

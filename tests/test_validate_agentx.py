@@ -124,7 +124,7 @@ def test_enforces_the_tag_policy_and_the_registry():
     assert len(problems) == 3
     assert "multi-agent — generic descriptor" in problems[0]
     assert "unregistered tag(s) multi-agent, Not-Registered" in problems[1]
-    assert "paperMeta.venue maps to registered tag Nature" in problems[2]
+    assert "paperMeta.venue maps to venue tag Nature" in problems[2]
 
 
 def test_requires_canonical_github_url():
@@ -168,7 +168,7 @@ def test_requires_registered_paper_venue_tag():
     file["agents"][0]["tags"] = ["Stanford"]
     assert validate.validate_snapshot_file(file) == [
         (
-            "agents[0] (alpha-agent): paperMeta.venue maps to registered tag Nature "
+            "agents[0] (alpha-agent): paperMeta.venue maps to venue tag Nature "
             "but tags does not contain it — run `updater backfill --agentx "
             "--fields venue-tags`"
         ),
@@ -190,3 +190,24 @@ def test_rejects_booleans_where_numbers_are_required():
     assert problems == [
         "agents[0] (alpha-agent): stars must be a non-negative integer, got True",
     ]
+
+
+def test_accepts_auto_venue_slug_tag_and_flags_missing_one():
+    file = _fixture()
+    file["agents"][0]["paperMeta"]["venue"] = "npj Health Systems"
+    file["agents"][0]["tags"] = ["Stanford", "npj-Health-Systems"]
+    assert validate.validate_snapshot_file(file) == []
+
+    file = _fixture()
+    file["agents"][0]["paperMeta"]["venue"] = "npj Health Systems"
+    file["agents"][0]["tags"] = ["Stanford"]
+    problems = validate.validate_snapshot_file(file)
+    assert len(problems) == 1
+    assert "maps to venue tag npj-Health-Systems" in problems[0]
+
+
+def test_non_venue_source_needs_no_tag():
+    file = _fixture()
+    file["agents"][0]["paperMeta"]["venue"] = "Nvidia's blog"
+    file["agents"][0]["tags"] = ["Stanford"]
+    assert validate.validate_snapshot_file(file) == []
